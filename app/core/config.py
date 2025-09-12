@@ -1,25 +1,24 @@
 import secrets
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import AnyHttpUrl, BaseSettings, EmailStr, HttpUrl, validator
+from pydantic import AnyHttpUrl, BaseSettings, EmailStr, HttpUrl, field_validator
 
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
-    # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    # 60 minutes * 24 hours * 30 days = 30 days
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
     SERVER_NAME: str
     SERVER_HOST: AnyHttpUrl
     # BACKEND_CORS_ORIGINS is a JSON-formatted list of origins
-    # e.g: '["http://localhost", "http://localhost:4200", "http://localhost:3000", \ 
-    # "http://localhost:8080", "https://localhost", "https://localhost:4200", \ 
+    # e.g: '["http://localhost", "http://localhost:4200", "http://localhost:3000", \
+    # "http://localhost:8080", "https://localhost", "https://localhost:4200", \
     # "https://localhost:3000", "https://localhost:8080"]'
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
@@ -29,27 +28,30 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str
     SENTRY_DSN: Optional[HttpUrl] = None
-    POSTGRES_SERVER: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+    SQLALCHEMY_DATABASE_URI: str
+    REDIS_URL: str
 
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+    AZURE_SERVICE_BUS_CONNECTION_STRING: Optional[str] = None
 
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
-
-    @validator("SQLALCHEMY_DATABASE_URI", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    @field_validator("CELERY_BROKER_URL", mode="before")
+    @classmethod
+    def assemble_celery_broker_url(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
         if isinstance(v, str):
             return v
-        return (
-            f"postgresql://{values.get('POSTGRES_USER')}:{values.get('POSTGRES_PASSWORD')}@"
-            f"{values.get('POSTGRES_SERVER')}/{values.get('POSTGRES_DB') or ''}"
-        )
+        if values.get("AZURE_SERVICE_BUS_CONNECTION_STRING"):
+            return values["AZURE_SERVICE_BUS_CONNECTION_STRING"]
+        return "redis://localhost:6379/0"  # Fallback or default if not provided
+
+    @field_validator("CELERY_RESULT_BACKEND", mode="before")
+    @classmethod
+    def assemble_celery_result_backend(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        if isinstance(v, str):
+            return v
+        if values.get("REDIS_URL"):
+            return values["REDIS_URL"]
+        return "redis://localhost:6379/0"  # Fallback or default if not provided
 
     SMTP_TLS: bool = True
     SMTP_PORT: Optional[int] = None
@@ -59,7 +61,8 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: Optional[EmailStr] = None
     EMAILS_FROM_NAME: Optional[str] = None
 
-    @validator("EMAILS_FROM_NAME")
+    @field_validator("EMAILS_FROM_NAME")
+    @classmethod
     def get_project_name(cls, v: Optional[str], values: Dict[str, Any]) -> str:
         if not v:
             return values["PROJECT_NAME"]
@@ -69,7 +72,8 @@ class Settings(BaseSettings):
     EMAIL_TEMPLATES_DIR: str = "/app/email-templates/build"
     EMAILS_ENABLED: bool = False
 
-    @validator("EMAILS_ENABLED", pre=True)
+    @field_validator("EMAILS_ENABLED", mode="before")
+    @classmethod
     def get_emails_enabled(cls, v: bool, values: Dict[str, Any]) -> bool:
         return bool(
             values.get("SMTP_HOST")
