@@ -19,5 +19,4 @@ class Booking(BookingBase):
     user: User
     event: Event
 
-    class Config:
-        orm_mode = True
+    model_config = {'from_attributes': True}

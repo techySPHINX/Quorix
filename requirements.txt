@@ -1,10 +1,12 @@
-fastapi
+fastapi>=0.104.0
 uvicorn[standard]
-SQLAlchemy
+SQLAlchemy>=2.0.0
 asyncpg
-pydantic
+pydantic>=2.0.0
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
 alembic
 slowapi
+redis
+celery

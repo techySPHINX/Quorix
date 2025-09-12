@@ -25,8 +25,7 @@ class UserUpdate(UserBase):
 class UserInDBBase(UserBase):
     id: Optional[int] = None
 
-    class Config:
-        orm_mode = True
+    model_config = {'from_attributes': True}
 
 
 # Additional properties to return via API
@@ -42,6 +41,7 @@ class UserInDB(UserInDBBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: Optional[str] = None
 
 
 class TokenPayload(BaseModel):
