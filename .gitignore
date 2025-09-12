@@ -38,6 +38,10 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+
+# Local environment and secrets
+.env
+evently-env/
 *.cover
 .hypothesis/
 .pytest_cache/

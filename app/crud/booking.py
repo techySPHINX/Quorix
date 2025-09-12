@@ -1,12 +1,16 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from .. import models, schemas
 from . import event as crud_event
-from datetime import datetime
 
 
 async def get_booking(db: AsyncSession, booking_id: int):
-    result = await db.execute(select(models.Booking).filter(models.Booking.id == booking_id))
+    result = await db.execute(
+        select(models.Booking).filter(models.Booking.id == booking_id)
+    )
     return result.scalars().first()
 
 
@@ -15,7 +19,9 @@ async def get_bookings(db: AsyncSession, skip: int = 0, limit: int = 100):
     return result.scalars().all()
 
 
-async def create_booking(db: AsyncSession, booking: schemas.BookingCreate, user_id: int):
+async def create_booking(
+    db: AsyncSession, booking: schemas.BookingCreate, user_id: int
+):
     async with db.begin_nested():
         try:
             # Use select with for_update to lock the row
@@ -33,7 +39,7 @@ async def create_booking(db: AsyncSession, booking: schemas.BookingCreate, user_
             if db_event.available_tickets >= booking.number_of_tickets:
                 db_event.available_tickets -= booking.number_of_tickets
                 db_booking = models.Booking(
-                    **booking.model_dump(),  # Use model_dump for Pydantic v2
+                    **booking.model_dump(),
                     user_id=user_id,
                     booked_at=datetime.utcnow(),
                     status="confirmed",
