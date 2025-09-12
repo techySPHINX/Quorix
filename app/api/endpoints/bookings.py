@@ -6,7 +6,7 @@ from .... import crud
 from .... import models
 from .... import schemas
 from ....api import deps
-# from ....celery_app import celery_app # Uncomment when celery is implemented
+from ....celery_app import celery_app # Uncomment when celery is implemented
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ async def create_booking(
     )
     if not booking:
         raise HTTPException(status_code=400, detail="Not enough tickets available")
-    # celery_app.send_task("app.tasks.send_booking_confirmation_email", args=[booking.id]) # Uncomment when celery is implemented
+    celery_app.send_task("app.tasks.send_booking_confirmation_email", args=[booking.id]) # Uncomment when celery is implemented
     return booking
 
 
@@ -84,5 +84,5 @@ async def cancel_booking(
     if not current_user.is_superuser and booking.user_id != current_user.id:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     booking = await crud.booking.cancel_booking(db=db, booking_id=booking_id)
-    # celery_app.send_task("app.tasks.send_booking_cancellation_email", args=[booking.id]) # Uncomment when celery is implemented
+    celery_app.send_task("app.tasks.send_booking_cancellation_email", args=[booking.id]) # Uncomment when celery is implemented
     return booking
