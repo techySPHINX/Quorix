@@ -1,11 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.waitlist import Waitlist, WaitlistStatus
-from app.models.event import Event
 from app.schemas.waitlist import WaitlistCreate
 
 
@@ -21,7 +20,7 @@ async def get_waitlist_by_user_event(
         select(Waitlist).filter(
             Waitlist.user_id == user_id,
             Waitlist.event_id == event_id,
-            Waitlist.status == WaitlistStatus.WAITING
+            Waitlist.status == WaitlistStatus.WAITING,
         )
     )
     return result.scalars().first()
@@ -109,14 +108,13 @@ async def get_waitlist_stats(db: AsyncSession, event_id: int) -> dict:
     result = await db.execute(
         select(
             func.count(Waitlist.id).label("total_waiting"),
-            func.sum(Waitlist.number_of_tickets).label("total_tickets_needed")
+            func.sum(Waitlist.number_of_tickets).label("total_tickets_needed"),
         ).filter(
-            Waitlist.event_id == event_id,
-            Waitlist.status == WaitlistStatus.WAITING
+            Waitlist.event_id == event_id, Waitlist.status == WaitlistStatus.WAITING
         )
     )
     stats = result.first()
     return {
         "total_waiting": stats.total_waiting or 0,
-        "total_tickets_needed": stats.total_tickets_needed or 0
+        "total_tickets_needed": stats.total_tickets_needed or 0,
     }

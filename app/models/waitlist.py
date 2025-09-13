@@ -27,6 +27,4 @@ class Waitlist(Base):
     user = relationship("User")
     event = relationship("Event")
 
-    __table_args__ = (
-        {"mysql_engine": "InnoDB"}
-    )
+    __table_args__ = {"mysql_engine": "InnoDB"}

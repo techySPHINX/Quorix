@@ -29,8 +29,7 @@ async def join_event_waitlist(
 
     if event.available_tickets >= waitlist_in.number_of_tickets:
         raise HTTPException(
-            status_code=400,
-            detail="Event has available tickets. Please book directly."
+            status_code=400, detail="Event has available tickets. Please book directly."
         )
 
     # Ensure the waitlist entry is for the correct event
@@ -39,8 +38,7 @@ async def join_event_waitlist(
     waitlist_entry = await crud.waitlist.join_waitlist(db, waitlist_in, current_user.id)
     if not waitlist_entry:
         raise HTTPException(
-            status_code=400,
-            detail="User is already on the waitlist for this event"
+            status_code=400, detail="User is already on the waitlist for this event"
         )
 
     return waitlist_entry
