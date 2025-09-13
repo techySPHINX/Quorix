@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Reminder - {{ project_name }}</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #fd7e14;
+        margin: 0;
+        font-size: 28px;
+      }
+      .event-details {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .detail-row:last-child {
+        border-bottom: none;
+      }
+      .detail-label {
+        font-weight: 600;
+        color: #495057;
+      }
+      .detail-value {
+        color: #212529;
+      }
+      .countdown-badge {
+        background: #fd7e14;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-weight: bold;
+        font-size: 18px;
+        display: inline-block;
+        margin: 20px 0;
+      }
+      .reminder-info {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #e9ecef;
+        color: #6c757d;
+        font-size: 14px;
+      }
+      .reminder-icon {
+        color: #fd7e14;
+        font-size: 48px;
+        margin-bottom: 10px;
+      }
+      @media (max-width: 600px) {
+        .detail-row {
+          flex-direction: column;
+        }
+        .detail-label {
+          margin-bottom: 5px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="reminder-icon">⏰</div>
+        <h1>Event Reminder</h1>
+        <p>Don't forget about your upcoming event, {{ user_name }}!</p>
+
+        <div class="countdown-badge">
+          {% if hours_until_event < 24 %} {{ hours_until_event }} hours to go!
+          {% else %} {{ (hours_until_event / 24)|round|int }} days to go! {%
+          endif %}
+        </div>
+      </div>
+
+      <div class="event-details">
+        <h2 style="margin-top: 0; color: #495057">Your Event Details</h2>
+
+        <div class="detail-row">
+          <span class="detail-label">Event:</span>
+          <span class="detail-value">{{ event_name }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Date & Time:</span>
+          <span class="detail-value"
+            >{{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else
+            'TBD' }}</span
+          >
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Location:</span>
+          <span class="detail-value">{{ event_location or 'TBD' }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Your Tickets:</span>
+          <span class="detail-value">{{ number_of_tickets }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Booking ID:</span>
+          <span class="detail-value">#{{ booking_id }}</span>
+        </div>
+      </div>
+
+      <div class="reminder-info">
+        <h3 style="margin-top: 0; color: #155724">Helpful Tips</h3>
+        <ul style="margin-bottom: 0">
+          <li>Arrive at least 30 minutes before the event starts</li>
+          <li>Bring a valid ID for verification</li>
+          <li>
+            Keep this email handy for quick access to your booking details
+          </li>
+          <li>
+            Check the weather and dress appropriately if it's an outdoor event
+          </li>
+        </ul>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0">
+        <p style="color: #495057; font-size: 16px">
+          We're excited to see you at the event! 🎉
+        </p>
+      </div>
+
+      <div class="footer">
+        <p>Thank you for choosing {{ project_name }}!</p>
+        <p>This is an automated email. Please do not reply to this message.</p>
+        <p>
+          &copy; {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

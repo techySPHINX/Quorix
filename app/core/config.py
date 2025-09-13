@@ -31,8 +31,28 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URI: str
     REDIS_URL: str
 
+    # Celery Configuration
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_RESULT_SERIALIZER: str = "json"
+    CELERY_ACCEPT_CONTENT: List[str] = ["json"]
+    CELERY_TIMEZONE: str = "UTC"
+    CELERY_ENABLE_UTC: bool = True
+    CELERY_TASK_ROUTES: Dict[str, Dict[str, str]] = {
+        "app.tasks.send_*": {"queue": "email"},
+        "app.tasks.notify_*": {"queue": "notifications"},
+    }
+
+    # SendGrid Email Configuration
+    SENDGRID_API_KEY: Optional[str] = None
+    SENDGRID_FROM_EMAIL: Optional[str] = None
+    SENDGRID_FROM_NAME: Optional[str] = None
+
+    # Email Templates
+    EMAIL_TEMPLATES_ENABLED: bool = True
+
+    # Legacy SMTP (fallback)
     AZURE_SERVICE_BUS_CONNECTION_STRING: Optional[str] = None
 
     @field_validator("CELERY_BROKER_URL", mode="before")
@@ -72,6 +92,13 @@ class Settings(BaseSettings):
             return values["PROJECT_NAME"]
         return v
 
+    @field_validator("SENDGRID_FROM_NAME", mode="before")
+    @classmethod
+    def get_sendgrid_from_name(cls, v: Optional[str], values: Dict[str, Any]) -> str:
+        if not v:
+            return values.get("PROJECT_NAME", "Evently")
+        return v
+
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
     EMAIL_TEMPLATES_DIR: str = "/app/email-templates/build"
     EMAILS_ENABLED: bool = False
@@ -79,11 +106,16 @@ class Settings(BaseSettings):
     @field_validator("EMAILS_ENABLED", mode="before")
     @classmethod
     def get_emails_enabled(cls, v: bool, values: Dict[str, Any]) -> bool:
-        return bool(
+        # Prefer SendGrid, fallback to SMTP
+        sendgrid_enabled = bool(
+            values.get("SENDGRID_API_KEY") and values.get("SENDGRID_FROM_EMAIL")
+        )
+        smtp_enabled = bool(
             values.get("SMTP_HOST")
             and values.get("SMTP_PORT")
             and values.get("EMAILS_FROM_EMAIL")
         )
+        return sendgrid_enabled or smtp_enabled
 
     EMAIL_TEST_USER: EmailStr = "test@example.com"  # type: ignore
     FIRST_SUPERUSER: EmailStr

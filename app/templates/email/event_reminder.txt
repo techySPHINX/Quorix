@@ -1,0 +1,34 @@
+EVENT REMINDER - {{ project_name }}
+
+Hello {{ user_name }},
+
+Don't forget about your upcoming event!
+
+{% if hours_until_event < 24 %}
+⏰ {{ hours_until_event }} HOURS TO GO!
+{% else %}
+⏰ {{ (hours_until_event / 24)|round|int }} DAYS TO GO!
+{% endif %}
+
+YOUR EVENT DETAILS:
+===================
+Event: {{ event_name }}
+Date & Time: {{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else 'TBD' }}
+Location: {{ event_location or 'TBD' }}
+Your Tickets: {{ number_of_tickets }}
+Booking ID: #{{ booking_id }}
+
+HELPFUL TIPS:
+=============
+- Arrive at least 30 minutes before the event starts
+- Bring a valid ID for verification
+- Keep this email handy for quick access to your booking details
+- Check the weather and dress appropriately if it's an outdoor event
+
+We're excited to see you at the event! 🎉
+
+Thank you for choosing {{ project_name }}!
+
+This is an automated email. Please do not reply to this message.
+
+© {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.

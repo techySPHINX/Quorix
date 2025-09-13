@@ -7,8 +7,6 @@ from app.models.booking import Booking
 from app.models.event import Event
 from app.schemas.booking import BookingCreate
 
-from . import waitlist as crud_waitlist
-
 
 async def get_booking(db: AsyncSession, booking_id: int):
     result = await db.execute(select(Booking).filter(Booking.id == booking_id))
@@ -76,8 +74,10 @@ async def cancel_booking(db: AsyncSession, booking_id: int):
                 db_booking.status = "cancelled"
 
                 # Notify waitlist users about available tickets
-                await crud_waitlist.notify_waitlist_users(
-                    db, db_booking.event_id, db_booking.number_of_tickets
+                from app.tasks import notify_waitlist_users
+
+                notify_waitlist_users.delay(
+                    db_booking.event_id, db_booking.number_of_tickets
                 )
 
                 await db.commit()

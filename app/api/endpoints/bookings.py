@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.api import deps
-from app.celery_app import celery_app
 from app.models.user import User
 from app.schemas.booking import Booking, BookingCreate
 
@@ -47,10 +46,9 @@ async def create_booking(
         )
 
     # Send confirmation email
-    celery_app.send_task(
-        "app.tasks.send_booking_confirmation_email",
-        args=[current_user.id, booking.id],
-    )
+    from app.tasks import send_booking_confirmation_email
+
+    send_booking_confirmation_email.delay(current_user.id, booking.id)
     return booking
 
 
@@ -107,8 +105,10 @@ async def cancel_booking(
     if not current_user.is_superuser and booking.user_id != current_user.id:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     booking = await crud.booking.cancel_booking(db=db, booking_id=booking_id)
-    celery_app.send_task(
-        "app.tasks.send_booking_cancellation_email",
-        args=[current_user.id, booking.id],
-    )
+
+    # Send cancellation email
+    from app.tasks import send_booking_cancellation_email
+
+    send_booking_cancellation_email.delay(current_user.id, booking.id)
+
     return booking

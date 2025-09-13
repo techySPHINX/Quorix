@@ -1,0 +1,24 @@
+BOOKING CANCELLATION - {{ project_name }}
+
+Hello {{ user_name }},
+
+Your booking has been successfully cancelled.
+
+CANCELLED BOOKING DETAILS:
+==========================
+Booking ID: #{{ booking_id }}
+Event: {{ event_name }}
+Original Event Date: {{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else 'TBD' }}
+Cancellation Date: {{ cancellation_date.strftime('%B %d, %Y at %I:%M %p') if cancellation_date else 'N/A' }}
+
+REFUND INFORMATION:
+===================
+{{ refund_info }}
+
+We're sorry to see you go. We hope to serve you again in the future!
+
+Thank you for choosing {{ project_name }}!
+
+This is an automated email. Please do not reply to this message.
+
+© {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.

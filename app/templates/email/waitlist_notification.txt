@@ -1,0 +1,26 @@
+TICKETS NOW AVAILABLE - {{ project_name }}
+
+Hello {{ user_name }},
+
+Great news! Tickets are now available for your waitlisted event.
+
+EVENT DETAILS:
+==============
+Event: {{ event_name }}
+Date & Time: {{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else 'TBD' }}
+Location: {{ event_location or 'TBD' }}
+Available Tickets: {{ available_tickets }}
+
+⏰ ACT FAST!
+============
+You have {{ booking_deadline }} to complete your booking before we notify the next person on the waitlist.
+
+BOOK YOUR TICKETS:
+==================
+Visit: {{ booking_url }}
+
+Thank you for your patience, {{ user_name }}!
+
+This is an automated email. Please do not reply to this message.
+
+© {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.

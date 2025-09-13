@@ -8,4 +8,7 @@ SessionLocal = async_sessionmaker(
     autocommit=False, autoflush=False, bind=engine, class_=AsyncSession
 )
 
+# Alias for use in tasks
+async_session_maker = SessionLocal
+
 Base = declarative_base()

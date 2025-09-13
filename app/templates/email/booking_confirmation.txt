@@ -1,0 +1,24 @@
+BOOKING CONFIRMED - {{ project_name }}
+
+Hello {{ user_name }},
+
+Your booking has been successfully confirmed!
+
+BOOKING DETAILS:
+================
+Booking ID: #{{ booking_id }}
+Event: {{ event_name }}
+Date & Time: {{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else 'TBD' }}
+Location: {{ event_location or 'TBD' }}
+Number of Tickets: {{ number_of_tickets }}
+Booking Date: {{ booking_date.strftime('%B %d, %Y at %I:%M %p') if booking_date else 'N/A' }}
+Total Amount: ${{ "%.2f"|format(total_price) if total_price else '0.00' }}
+
+IMPORTANT:
+Please keep this confirmation for your records. If you need to cancel your booking, please contact our support team at least 24 hours before the event.
+
+Thank you for choosing {{ project_name }}!
+
+This is an automated email. Please do not reply to this message.
+
+© {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.

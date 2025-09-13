@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Booking Confirmation - {{ project_name }}</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #28a745;
+        margin: 0;
+        font-size: 28px;
+      }
+      .booking-details {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .detail-row:last-child {
+        border-bottom: none;
+      }
+      .detail-label {
+        font-weight: 600;
+        color: #495057;
+      }
+      .detail-value {
+        color: #212529;
+      }
+      .total-price {
+        font-size: 18px;
+        font-weight: bold;
+        color: #28a745;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #e9ecef;
+        color: #6c757d;
+        font-size: 14px;
+      }
+      .success-icon {
+        color: #28a745;
+        font-size: 48px;
+        margin-bottom: 10px;
+      }
+      @media (max-width: 600px) {
+        .detail-row {
+          flex-direction: column;
+        }
+        .detail-label {
+          margin-bottom: 5px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="success-icon">✅</div>
+        <h1>Booking Confirmed!</h1>
+        <p>Thank you for your booking, {{ user_name }}!</p>
+      </div>
+
+      <div class="booking-details">
+        <h2 style="margin-top: 0; color: #495057">Booking Details</h2>
+
+        <div class="detail-row">
+          <span class="detail-label">Booking ID:</span>
+          <span class="detail-value">#{{ booking_id }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Event:</span>
+          <span class="detail-value">{{ event_name }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Date & Time:</span>
+          <span class="detail-value"
+            >{{ event_date.strftime('%B %d, %Y at %I:%M %p') if event_date else
+            'TBD' }}</span
+          >
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Location:</span>
+          <span class="detail-value">{{ event_location or 'TBD' }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Number of Tickets:</span>
+          <span class="detail-value">{{ number_of_tickets }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Booking Date:</span>
+          <span class="detail-value"
+            >{{ booking_date.strftime('%B %d, %Y at %I:%M %p') if booking_date
+            else 'N/A' }}</span
+          >
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Total Amount:</span>
+          <span class="detail-value total-price"
+            >${{ "%.2f"|format(total_price) if total_price else '0.00' }}</span
+          >
+        </div>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0">
+        <p style="font-size: 16px; color: #495057; margin-bottom: 15px">
+          <strong>Important:</strong> Please keep this confirmation for your
+          records.
+        </p>
+        <p style="color: #6c757d">
+          If you need to cancel your booking, please contact our support team at
+          least 24 hours before the event.
+        </p>
+      </div>
+
+      <div class="footer">
+        <p>Thank you for choosing {{ project_name }}!</p>
+        <p>This is an automated email. Please do not reply to this message.</p>
+        <p>
+          &copy; {{ 'now'|date('%Y') }} {{ project_name }}. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
