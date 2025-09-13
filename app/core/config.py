@@ -37,7 +37,9 @@ class Settings(BaseSettings):
 
     @field_validator("CELERY_BROKER_URL", mode="before")
     @classmethod
-    def assemble_celery_broker_url(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def assemble_celery_broker_url(
+        cls, v: Optional[str], values: Dict[str, Any]
+    ) -> Any:
         if isinstance(v, str):
             return v
         if values.get("AZURE_SERVICE_BUS_CONNECTION_STRING"):
@@ -46,7 +48,9 @@ class Settings(BaseSettings):
 
     @field_validator("CELERY_RESULT_BACKEND", mode="before")
     @classmethod
-    def assemble_celery_result_backend(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def assemble_celery_result_backend(
+        cls, v: Optional[str], values: Dict[str, Any]
+    ) -> Any:
         if isinstance(v, str):
             return v
         if values.get("REDIS_URL"):

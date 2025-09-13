@@ -3,20 +3,25 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from redis.asyncio import Redis  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
-from jose import jwt, JWTError
 
-from .... import crud, models, schemas
-from ....core import security
-from ....core.config import settings
-from ....api import deps
+from app import crud
+from app.api import deps
+from app.core import security
+from app.core.config import settings
+from app.models.user import User
+from app.schemas.user import Token
+from app.schemas.user import User as UserSchema
 
 router = APIRouter()
 
 
-@router.post("/login/access-token", response_model=schemas.Token)
+@router.post("/login/access-token", response_model=Token)
 async def login_access_token(
     db: AsyncSession = Depends(deps.get_db),
+    redis_client: Redis = Depends(deps.get_redis_client),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Any:
     """
@@ -33,21 +38,36 @@ async def login_access_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
 
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+    refresh_token = security.create_refresh_token(
+        user.id, expires_delta=refresh_token_expires
+    )
+
+    await redis_client.set(
+        f"access_token:{user.id}",
+        access_token,
+        ex=access_token_expires,
+    )
+    await redis_client.set(
+        f"refresh_token:{user.id}",
+        refresh_token,
+        ex=refresh_token_expires,
+    )
+
     return {
-        "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
-        "refresh_token": security.create_refresh_token(
-            user.id, expires_delta=refresh_token_expires
-        ),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
     }
 
 
-@router.post("/login/refresh-token", response_model=schemas.Token)
+@router.post("/login/refresh-token", response_model=Token)
 async def refresh_token(
     refresh_token: str = Body(..., embed=True),
     db: AsyncSession = Depends(deps.get_db),
+    redis_client: Redis = Depends(deps.get_redis_client),
 ) -> Any:
     """
     Refresh access token using refresh token
@@ -66,20 +86,45 @@ async def refresh_token(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+    stored_refresh_token = await redis_client.get(f"refresh_token:{user.id}")
+    if not stored_refresh_token or stored_refresh_token != refresh_token:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+
+    await redis_client.set(
+        f"access_token:{user.id}",
+        access_token,
+        ex=access_token_expires,
+    )
+
     return {
-        "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
+        "access_token": access_token,
         "token_type": "bearer",
     }
 
 
-@router.post("/login/test-token", response_model=schemas.User)
+@router.post("/login/test-token", response_model=UserSchema)
 async def test_token(
-    current_user: models.User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Test access token
     """
     return current_user
+
+
+@router.post("/logout")
+async def logout(
+    current_user: User = Depends(deps.get_current_user),
+    redis_client: Redis = Depends(deps.get_redis_client),
+) -> Any:
+    """
+    Logout user
+    """
+    await redis_client.delete(f"access_token:{current_user.id}")
+    await redis_client.delete(f"refresh_token:{current_user.id}")
+    return {"message": "Logout successful"}

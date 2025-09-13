@@ -1,17 +1,22 @@
 from .celery_app import celery_app
-from .database import SessionLocal
-from . import crud
+from .redis import redis_client
+
 
 @celery_app.task(acks_late=True)
-def send_booking_confirmation_email(booking_id: int):
+def send_booking_confirmation_email(user_id: int, booking_id: int):
     """
-    Placeholder for sending a booking confirmation email.
-    In a real application, this would interact with an email service.
+    Sends a booking confirmation email and stores a notification in Redis.
     """
+    message = f"Booking {booking_id} has been confirmed."
+    redis_client.lpush(f"notifications:{user_id}", message)
     print(f"Simulating sending booking confirmation email for booking ID: {booking_id}")
-    # Example of how you might access the database within a Celery task
-    # with SessionLocal() as db:
-    #     booking = crud.booking.get_booking(db, booking_id)
-    #     if booking:
-    #         print(f"Booking details: {booking.id}, {booking.status}")
-    #         # Logic to send email
+
+
+@celery_app.task(acks_late=True)
+def send_booking_cancellation_email(user_id: int, booking_id: int):
+    """
+    Sends a booking cancellation email and stores a notification in Redis.
+    """
+    message = f"Booking {booking_id} has been cancelled."
+    redis_client.lpush(f"notifications:{user_id}", message)
+    print(f"Simulating sending booking cancellation email for booking ID: {booking_id}")

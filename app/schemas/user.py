@@ -25,7 +25,7 @@ class UserUpdate(UserBase):
 class UserInDBBase(UserBase):
     id: Optional[int] = None
 
-    model_config = {'from_attributes': True}
+    model_config = {"from_attributes": True}
 
 
 # Additional properties to return via API

@@ -1,61 +1,84 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from .... import crud
-from .... import models
-from .... import schemas
-from ....api import deps
-from ....celery_app import celery_app # Uncomment when celery is implemented
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import crud
+from app.api import deps
+from app.celery_app import celery_app
+from app.models.user import User
+from app.schemas.booking import Booking, BookingCreate
 
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.Booking)
+@router.post("/", response_model=Booking)
 async def create_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
-    booking_in: schemas.BookingCreate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    booking_in: BookingCreate,
+    current_user: User = Depends(deps.get_current_active_user),
 ):
     """
-    Create new booking.
+    Create new booking. If event is sold out, suggests joining waitlist.
     """
+    # First check if event has enough tickets
+    event = await crud.event.get_event(db, booking_in.event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
     booking = await crud.booking.create_booking(
         db=db, booking=booking_in, user_id=current_user.id
     )
+
     if not booking:
-        raise HTTPException(status_code=400, detail="Not enough tickets available")
-    celery_app.send_task("app.tasks.send_booking_confirmation_email", args=[booking.id]) # Uncomment when celery is implemented
+        # Event is sold out, suggest waitlist
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Not enough tickets available",
+                "available_tickets": event.available_tickets,
+                "requested_tickets": booking_in.number_of_tickets,
+                "suggestion": (
+                    f"Consider joining the waitlist at "
+                    f"/api/v1/waitlist/{event.id}/join"
+                ),
+            },
+        )
+
+    # Send confirmation email
+    celery_app.send_task(
+        "app.tasks.send_booking_confirmation_email",
+        args=[current_user.id, booking.id],
+    )
     return booking
 
 
-@router.get("/", response_model=List[schemas.Booking])
+@router.get("/", response_model=List[Booking])
 async def read_bookings(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_active_user),
 ):
     """
-    Retrieve bookings.
+    Retrieve bookings. Regular users see only their own bookings.
     """
     if current_user.is_superuser:
         bookings = await crud.booking.get_bookings(db, skip=skip, limit=limit)
     else:
-        # Assuming a get_bookings_by_user function exists or will be created
-        # For now, filtering after fetching all, which is not ideal for large datasets
-        all_bookings = await crud.booking.get_bookings(db)
-        bookings = [b for b in all_bookings if b.user_id == current_user.id][skip:skip+limit]
+        bookings = await crud.booking.get_user_bookings(
+            db, current_user.id, skip=skip, limit=limit
+        )
     return bookings
 
 
-@router.get("/{booking_id}", response_model=schemas.Booking)
+@router.get("/{booking_id}", response_model=Booking)
 async def read_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
     booking_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_active_user),
 ):
     """
     Get booking by ID.
@@ -68,12 +91,12 @@ async def read_booking(
     return booking
 
 
-@router.put("/{booking_id}/cancel", response_model=schemas.Booking)
+@router.put("/{booking_id}/cancel", response_model=Booking)
 async def cancel_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
     booking_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_active_user),
 ):
     """
     Cancel a booking.
@@ -84,5 +107,8 @@ async def cancel_booking(
     if not current_user.is_superuser and booking.user_id != current_user.id:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     booking = await crud.booking.cancel_booking(db=db, booking_id=booking_id)
-    celery_app.send_task("app.tasks.send_booking_cancellation_email", args=[booking.id]) # Uncomment when celery is implemented
+    celery_app.send_task(
+        "app.tasks.send_booking_cancellation_email",
+        args=[current_user.id, booking.id],
+    )
     return booking

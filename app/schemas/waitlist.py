@@ -1,26 +1,28 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
-from ..models.booking import BookingStatus
+from ..models.waitlist import WaitlistStatus
 from .event import Event
 from .user import User
 
 
-class BookingBase(BaseModel):
+class WaitlistBase(BaseModel):
     event_id: int
     number_of_tickets: int
 
 
-class BookingCreate(BookingBase):
+class WaitlistCreate(WaitlistBase):
     pass
 
 
-class Booking(BookingBase):
+class Waitlist(WaitlistBase):
     id: int
     user_id: int
-    booked_at: datetime
-    status: BookingStatus
+    joined_at: datetime
+    notified_at: Optional[datetime] = None
+    status: WaitlistStatus
     user: User
     event: Event
 

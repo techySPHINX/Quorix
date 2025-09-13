@@ -1,19 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from .... import crud, models, schemas
-from ....api import deps
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import crud
+from app.api import deps
+from app.models.user import User as UserModel
+from app.schemas.user import User as UserSchema
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[schemas.User])
+@router.get("/", response_model=List[UserSchema])
 async def read_users(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Retrieve users.
@@ -24,17 +27,17 @@ async def read_users(
     return users
 
 
-@router.get("/{user_id}", response_model=schemas.User)
+@router.get("/{user_id}", response_model=UserSchema)
 async def read_user(
     *,
     db: AsyncSession = Depends(deps.get_db),
     user_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Get user by ID.
     """
-    user = await crud.user.get(db, id=user_id) # Changed to crud.user.get
+    user = await crud.user.get(db, id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == current_user.id or current_user.is_superuser:
