@@ -24,8 +24,7 @@ class EmailService:
 
         template_dir = Path(__file__).parent.parent / "templates" / "email"
         self.jinja_env = Environment(
-            loader=FileSystemLoader(str(template_dir)),
-            autoescape=True
+            loader=FileSystemLoader(str(template_dir)), autoescape=True
         )
 
     def _get_smtp_config(self) -> Dict[str, Any]:
@@ -48,7 +47,9 @@ class EmailService:
             "password": settings.SENDGRID_API_KEY,
         }
 
-    def _render_template(self, template_name: str, context: Dict[str, Any]) -> tuple[str, str]:
+    def _render_template(
+        self, template_name: str, context: Dict[str, Any]
+    ) -> tuple[str, str]:
         try:
             # Render HTML template
             html_template = self.jinja_env.get_template(f"{template_name}.html")
@@ -60,8 +61,9 @@ class EmailService:
                 text_content = text_template.render(**context)
             except Exception:
                 import re
-                text_content = re.sub(r'<[^>]+>', '', html_content)
-                text_content = re.sub(r'\s+', ' ', text_content).strip()
+
+                text_content = re.sub(r"<[^>]+>", "", html_content)
+                text_content = re.sub(r"\s+", " ", text_content).strip()
 
             return html_content, text_content
         except Exception as e:
@@ -114,16 +116,11 @@ class EmailService:
                 html=html_content,
                 text=text_content,
                 subject=subject,
-                mail_from=(from_email, from_name)
+                mail_from=(from_email, from_name),
             )
 
             # Send email
-            response = message.send(
-                to=to_email,
-                cc=cc,
-                bcc=bcc,
-                smtp=smtp_config
-            )
+            response = message.send(to=to_email, cc=cc, bcc=bcc, smtp=smtp_config)
 
             if response.status_code == 250:
                 logger.info(f"Email sent successfully to {to_email}")
@@ -137,10 +134,7 @@ class EmailService:
             return False
 
     async def send_booking_confirmation(
-        self,
-        user_email: str,
-        user_name: str,
-        booking_data: Dict[str, Any]
+        self, user_email: str, user_name: str, booking_data: Dict[str, Any]
     ) -> bool:
         """Send booking confirmation email."""
         context = {
@@ -159,14 +153,11 @@ class EmailService:
             to_email=user_email,
             subject=f"Booking Confirmation - {booking_data.get('event_name')}",
             template_name="booking_confirmation",
-            context=context
+            context=context,
         )
 
     async def send_booking_cancellation(
-        self,
-        user_email: str,
-        user_name: str,
-        booking_data: Dict[str, Any]
+        self, user_email: str, user_name: str, booking_data: Dict[str, Any]
     ) -> bool:
         """Send booking cancellation email."""
         context = {
@@ -175,7 +166,9 @@ class EmailService:
             "event_name": booking_data.get("event_name"),
             "event_date": booking_data.get("event_date"),
             "cancellation_date": booking_data.get("cancelled_at"),
-            "refund_info": booking_data.get("refund_info", "Refund will be processed within 5-7 business days."),
+            "refund_info": booking_data.get(
+                "refund_info", "Refund will be processed within 5-7 business days."
+            ),
             "project_name": settings.PROJECT_NAME,
         }
 
@@ -183,7 +176,7 @@ class EmailService:
             to_email=user_email,
             subject=f"Booking Cancellation - {booking_data.get('event_name')}",
             template_name="booking_cancellation",
-            context=context
+            context=context,
         )
 
     async def send_waitlist_notification(
@@ -191,7 +184,7 @@ class EmailService:
         user_email: str,
         user_name: str,
         event_data: Dict[str, Any],
-        available_tickets: int
+        available_tickets: int,
     ) -> bool:
         """Send waitlist notification email."""
         context = {
@@ -202,14 +195,14 @@ class EmailService:
             "available_tickets": available_tickets,
             "booking_deadline": event_data.get("booking_deadline", "24 hours"),
             "project_name": settings.PROJECT_NAME,
-            "booking_url": f"{settings.SERVER_HOST}/events/{event_data.get('id')}/book"
+            "booking_url": f"{settings.SERVER_HOST}/events/{event_data.get('id')}/book",
         }
 
         return await self.send_email(
             to_email=user_email,
             subject=f"Tickets Available - {event_data.get('name')}",
             template_name="waitlist_notification",
-            context=context
+            context=context,
         )
 
     async def send_event_reminder(
@@ -217,7 +210,7 @@ class EmailService:
         user_email: str,
         user_name: str,
         booking_data: Dict[str, Any],
-        hours_until_event: int
+        hours_until_event: int,
     ) -> bool:
         """Send event reminder email."""
         context = {
@@ -235,7 +228,7 @@ class EmailService:
             to_email=user_email,
             subject=f"Event Reminder - {booking_data.get('event_name')}",
             template_name="event_reminder",
-            context=context
+            context=context,
         )
 
 
