@@ -3,10 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ..models.notification import (
-    NotificationPriority,
-    NotificationType,
-)
+from ..models.notification import NotificationPriority, NotificationType
 
 
 class NotificationBase(BaseModel):

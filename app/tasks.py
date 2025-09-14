@@ -13,6 +13,8 @@ from .database import async_session_maker
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 
 async def get_async_db() -> AsyncSession:
     """Get async database session."""
@@ -579,7 +581,7 @@ def cleanup_old_notifications() -> None:
 
     async def _cleanup() -> None:
         try:
-            from app.crud import notification as notification_crud
+            from app.crud import notification_crud as notification_crud
 
             from .database import async_session_maker
 
@@ -616,7 +618,7 @@ def process_in_app_notification(self: Any, notification_data: dict) -> None:
 
     async def _create_notification() -> None:
         try:
-            from app.crud import notification as notification_crud
+            from app.crud import notification_crud as notification_crud
 
             from .database import async_session_maker
             from .models.notification import NotificationPriority, NotificationType
@@ -667,7 +669,7 @@ def process_bulk_notifications(self: Any, notification_batch: list) -> None:
 
     async def _process_batch() -> None:
         try:
-            from app.crud import notification as notification_crud
+            from app.crud import notification_crud as notification_crud
 
             from .database import async_session_maker
 
@@ -728,7 +730,7 @@ def send_combined_notification(
 
     async def _send_combined() -> None:
         try:
-            from app.crud import notification as notification_crud
+            from app.crud import notification_crud as notification_crud
 
             from .database import async_session_maker
 
@@ -796,7 +798,7 @@ def process_notification_digest() -> None:
         try:
             from datetime import timedelta
 
-            from app.crud import notification as notification_crud
+            from app.crud import notification_crud as notification_crud
 
             from .crud.user import get_users
             from .database import async_session_maker

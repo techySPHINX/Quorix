@@ -6,7 +6,7 @@ Thank you for joining {{ project_name }}. We're excited to help you discover and
 
 Here's what you can do with your account:
 - Browse and book tickets for events
-- Join waitlists for sold-out events  
+- Join waitlists for sold-out events
 - Manage your bookings and preferences
 - Receive notifications about events you're interested in
 

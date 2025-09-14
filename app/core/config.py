@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Database & Redis
     SQLALCHEMY_DATABASE_URI: str
     REDIS_URL: str
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_ECHO: bool = False
 
     # Celery
     CELERY_BROKER_URL: str
@@ -71,6 +76,7 @@ class Settings(BaseSettings):
     # Email Templates
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
     EMAIL_TEMPLATES_DIR: str = "app/templates/email"
+    EMAIL_TEMPLATES_ENABLED: bool = True
     EMAILS_ENABLED: bool = False
 
     @field_validator("EMAILS_ENABLED", mode="before")  # type: ignore[misc]

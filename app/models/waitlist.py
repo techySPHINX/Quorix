@@ -4,12 +4,10 @@ from typing import Optional
 from sqlalchemy import DateTime
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey, Index, Integer
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-
-class Base(DeclarativeBase):
-    pass
+from ..database import Base
 
 
 class WaitlistStatus(str, enum.Enum):

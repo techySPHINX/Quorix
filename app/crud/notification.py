@@ -5,19 +5,14 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.notification import (
-    Notification,
-    NotificationPriority,
-    NotificationType,
-)
+from ..models.notification import Notification, NotificationPriority, NotificationType
 from ..schemas.notification import NotificationCreate
 
 logger = logging.getLogger(__name__)
 
 
 async def create_notification(
-    db: AsyncSession,
-    notification: NotificationCreate
+    db: AsyncSession, notification: NotificationCreate
 ) -> Notification:
     """Create a new in-app notification"""
     db_notification = Notification(**notification.model_dump())
@@ -46,7 +41,7 @@ async def create_bulk(
             title=title,
             message=message,
             data=str(data) if data else None,
-            priority=priority
+            priority=priority,
         )
         notifications.append(db_notification)
 
@@ -66,14 +61,14 @@ async def get_user_notifications(
     limit: int = 20,
     unread_only: bool = False,
     notification_types: Optional[List[NotificationType]] = None,
-    priority: Optional[NotificationPriority] = None
+    priority: Optional[NotificationPriority] = None,
 ) -> List[Notification]:
     """Get user's notifications with filtering and pagination"""
     query = select(Notification).filter(Notification.user_id == user_id)
 
     # Apply filters
     if unread_only:
-        query = query.filter(Notification.is_read == False)
+        query = query.filter(~Notification.is_read)
 
     if notification_types:
         query = query.filter(Notification.type.in_(notification_types))
@@ -89,52 +84,45 @@ async def get_user_notifications(
 
 
 async def get_notification(
-    db: AsyncSession,
-    notification_id: int
+    db: AsyncSession, notification_id: int
 ) -> Optional[Notification]:
     """Get notification by ID"""
     result = await db.execute(
         select(Notification).filter(Notification.id == notification_id)
     )
-    return result.scalars().first()
+    notification: Optional[Notification] = result.scalars().first()
+    return notification
 
 
-async def mark_read(
-    db: AsyncSession,
-    notification_id: int
-) -> Optional[Notification]:
+async def mark_read(db: AsyncSession, notification_id: int) -> Optional[Notification]:
     """Mark a notification as read"""
     result = await db.execute(
         select(Notification).filter(Notification.id == notification_id)
     )
-    notification = result.scalars().first()
+    notification: Optional[Notification] = result.scalars().first()
 
     if notification:
-        notification.is_read = True  # type: ignore[assignment]
-        notification.read_at = datetime.utcnow()  # type: ignore[assignment]
+        notification.is_read = True
+        notification.read_at = datetime.utcnow()
         await db.commit()
         await db.refresh(notification)
 
     return notification
 
 
-async def mark_all_read(
-    db: AsyncSession,
-    user_id: int
-) -> int:
+async def mark_all_read(db: AsyncSession, user_id: int) -> int:
     """Mark all user notifications as read"""
     result = await db.execute(
         select(Notification).filter(
-            Notification.user_id == user_id,
-            Notification.is_read == False
+            Notification.user_id == user_id, ~Notification.is_read
         )
     )
     notifications = result.scalars().all()
 
     count = 0
     for notification in notifications:
-        notification.is_read = True  # type: ignore[assignment]
-        notification.read_at = datetime.utcnow()  # type: ignore[assignment]
+        notification.is_read = True
+        notification.read_at = datetime.utcnow()
         count += 1
 
     if count > 0:
@@ -143,10 +131,7 @@ async def mark_all_read(
     return count
 
 
-async def delete_notification(
-    db: AsyncSession,
-    notification_id: int
-) -> bool:
+async def delete_notification(db: AsyncSession, notification_id: int) -> bool:
     """Delete a notification"""
     result = await db.execute(
         select(Notification).filter(Notification.id == notification_id)
@@ -161,10 +146,7 @@ async def delete_notification(
     return False
 
 
-async def get_user_stats(
-    db: AsyncSession,
-    user_id: int
-) -> Dict[str, Any]:
+async def get_user_stats(db: AsyncSession, user_id: int) -> Dict[str, Any]:
     """Get notification statistics for a user"""
 
     # Get total notifications
@@ -176,8 +158,7 @@ async def get_user_stats(
     # Get unread count
     unread_result = await db.execute(
         select(func.count(Notification.id)).filter(
-            Notification.user_id == user_id,
-            Notification.is_read == False
+            Notification.user_id == user_id, ~Notification.is_read
         )
     )
     unread = unread_result.scalar() or 0
@@ -186,8 +167,7 @@ async def get_user_stats(
     week_ago = datetime.utcnow() - timedelta(days=7)
     recent_result = await db.execute(
         select(func.count(Notification.id)).filter(
-            Notification.user_id == user_id,
-            Notification.created_at >= week_ago
+            Notification.user_id == user_id, Notification.created_at >= week_ago
         )
     )
     recent = recent_result.scalar() or 0

@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool
 from sqlalchemy.pool.base import _ConnectionFairy, _ConnectionRecord
 
 from app.core.config import settings
@@ -11,9 +11,7 @@ from app.core.config import settings
 engine_kwargs = {
     "pool_pre_ping": True,
     "pool_recycle": 300,  # Recycle connections every 5 minutes
-    "pool_size": 10,  # Connection pool size
-    "max_overflow": 20,  # Extra connections beyond pool_size
-    "poolclass": QueuePool,
+    "poolclass": NullPool,
     "echo": getattr(settings, "DEBUG", False),
     "connect_args": {
         "command_timeout": 60,
@@ -23,7 +21,12 @@ engine_kwargs = {
     },
 }
 
-engine = create_async_engine(settings.SQLALCHEMY_DATABASE_URI, **engine_kwargs)
+engine = create_async_engine(
+    str(settings.SQLALCHEMY_DATABASE_URI).replace(
+        "postgresql://", "postgresql+asyncpg://"
+    ),
+    **engine_kwargs,
+)
 
 SessionLocal = async_sessionmaker(
     autocommit=False,

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import Boolean, DateTime
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import Index, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 if TYPE_CHECKING:
@@ -12,9 +12,7 @@ if TYPE_CHECKING:
     from .notification import Notification, NotificationPreference
     from .waitlist import Waitlist
 
-
-class Base(DeclarativeBase):
-    pass
+from ..database import Base
 
 
 class UserRole(str, enum.Enum):

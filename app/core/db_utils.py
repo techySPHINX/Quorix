@@ -1,15 +1,15 @@
-from contextlib import asynccontextmanager
 import re
+from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Type, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.engine import Result
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import Result
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.orm import DeclarativeBase
 
-T = TypeVar('T', bound=DeclarativeBase)
+T = TypeVar("T", bound=DeclarativeBase)
 
 
 class PaginationParams(BaseModel):
@@ -42,14 +42,16 @@ class PaginatedResponse(BaseModel):
     pages: int
 
     @classmethod
-    def create(cls, items: List[Any], total: int, pagination: PaginationParams) -> "PaginatedResponse":
+    def create(
+        cls, items: List[Any], total: int, pagination: PaginationParams
+    ) -> "PaginatedResponse":
         pages = (total + pagination.page_size - 1) // pagination.page_size
         return cls(
             items=items,
             total=total,
             page=pagination.page,
             page_size=pagination.page_size,
-            pages=pages
+            pages=pages,
         )
 
 
@@ -68,7 +70,7 @@ async def execute_with_retry(
     query_func: Callable[..., Any],
     max_retries: int = 3,
     *args: Any,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Any:
     last_exception: Optional[Exception] = None
 
@@ -80,7 +82,10 @@ async def execute_with_retry(
             if attempt < max_retries:
                 error_msg = str(e).lower()
                 retryable_errors = [
-                    'connection', 'timeout', 'deadlock', 'serialization failure'
+                    "connection",
+                    "timeout",
+                    "deadlock",
+                    "serialization failure",
                 ]
 
                 if any(err in error_msg for err in retryable_errors):
@@ -123,7 +128,7 @@ async def bulk_insert_or_update(
 
     affected_rows = 0
     for i in range(0, len(data), batch_size):
-        batch = data[i: i + batch_size]
+        batch = data[i : i + batch_size]
         if not batch:
             continue
 
@@ -186,12 +191,12 @@ async def get_table_stats(db: AsyncSession, table_name: str) -> Dict[str, Any]:
         result = await db.execute(
             text(
                 """
-                SELECT 
+                SELECT
                     indexname,
                     idx_scan,
                     idx_tup_read,
                     idx_tup_fetch
-                FROM pg_stat_user_indexes 
+                FROM pg_stat_user_indexes
                 WHERE relname = :t
                 """
             ),
@@ -226,7 +231,7 @@ class DatabaseHealthCheck:
             return False
 
     @staticmethod
-    async def get_connection_pool_status(engine) -> Dict[str, Any]:
+    async def get_connection_pool_status(engine: AsyncEngine) -> Dict[str, Any]:
         pool = engine.pool
         return {
             "pool_size": pool.size(),
@@ -237,20 +242,22 @@ class DatabaseHealthCheck:
         }
 
     @staticmethod
-    async def get_slow_queries(db: AsyncSession, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_slow_queries(
+        db: AsyncSession, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         try:
             result = await db.execute(
                 text(
                     """
-                    SELECT 
+                    SELECT
                         query,
                         mean_exec_time,
                         calls,
                         total_exec_time,
                         rows,
                         100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
-                    FROM pg_stat_statements 
-                    ORDER BY mean_exec_time DESC 
+                    FROM pg_stat_statements
+                    ORDER BY mean_exec_time DESC
                     LIMIT :limit
                     """
                 ),

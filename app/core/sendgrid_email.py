@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from jinja2 import Environment, FileSystemLoader
-from sendgrid import SendGridAPIClient  # type: ignore
-from sendgrid.helpers.mail import Mail, From, To, Content  # type: ignore
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Content, From, Mail, To
 
 from .config import settings
 
@@ -87,13 +87,15 @@ class SendGridEmailService:
                 for bcc_email in bcc:
                     mail.add_bcc(To(bcc_email))
 
-            response = self.client.send(mail)  # type: ignore
+            response = self.client.send(mail)
 
             if response.status_code in [200, 201, 202]:
                 logger.info(f"Email sent successfully to {to_email}")
                 return True
             else:
-                logger.error(f"SendGrid API error: {response.status_code} - {response.body}")
+                logger.error(
+                    f"SendGrid API error: {response.status_code} - {response.body}"
+                )
                 return False
 
         except Exception as e:
@@ -125,6 +127,168 @@ class SendGridEmailService:
             )
         except Exception as e:
             logger.error(f"Error sending booking confirmation email: {e}")
+            return False
+
+    async def send_booking_cancellation(
+        self, user_email: str, user_name: str, booking_data: Dict[str, Any]
+    ) -> bool:
+        """Send booking cancellation email"""
+        try:
+            context = {
+                "user_name": user_name,
+                "booking_data": booking_data,
+                "project_name": settings.PROJECT_NAME,
+                "support_email": settings.SENDGRID_FROM_EMAIL,
+            }
+
+            html_content, text_content = self._render_template(
+                "booking_cancellation", context
+            )
+
+            return await self._send_email_sendgrid(
+                to_email=user_email,
+                subject=f"Booking Cancellation - {booking_data.get('event_name', '')}",
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error sending booking cancellation email: {e}")
+            return False
+
+    async def send_waitlist_notification(
+        self,
+        user_email: str,
+        user_name: str,
+        event_data: Dict[str, Any],
+        available_tickets: int,
+    ) -> bool:
+        """Send waitlist notification email"""
+        try:
+            context = {
+                "user_name": user_name,
+                "event_data": event_data,
+                "available_tickets": available_tickets,
+                "project_name": settings.PROJECT_NAME,
+            }
+
+            html_content, text_content = self._render_template(
+                "waitlist_notification", context
+            )
+
+            return await self._send_email_sendgrid(
+                to_email=user_email,
+                subject=f"Tickets Available - {event_data.get('name', '')}",
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error sending waitlist notification email: {e}")
+            return False
+
+    async def send_event_reminder(
+        self,
+        user_email: str,
+        user_name: str,
+        booking_data: Dict[str, Any],
+        hours_until_event: int = 24,
+    ) -> bool:
+        """Send event reminder email"""
+        try:
+            context = {
+                "user_name": user_name,
+                "booking_data": booking_data,
+                "hours_until_event": hours_until_event,
+                "project_name": settings.PROJECT_NAME,
+            }
+
+            html_content, text_content = self._render_template(
+                "event_reminder", context
+            )
+
+            return await self._send_email_sendgrid(
+                to_email=user_email,
+                subject=f"Event Reminder - {booking_data.get('event_name', '')}",
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error sending event reminder email: {e}")
+            return False
+
+    async def send_password_reset(
+        self, user_email: str, user_name: str, reset_token: str
+    ) -> bool:
+        """Send password reset email"""
+        try:
+            context = {
+                "user_name": user_name,
+                "reset_token": reset_token,
+                "project_name": settings.PROJECT_NAME,
+            }
+
+            html_content, text_content = self._render_template(
+                "password_reset", context
+            )
+
+            return await self._send_email_sendgrid(
+                to_email=user_email,
+                subject="Password Reset Request",
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error sending password reset email: {e}")
+            return False
+
+    async def send_welcome_email(self, user_email: str, user_name: str) -> bool:
+        """Send welcome email"""
+        try:
+            context = {
+                "user_name": user_name,
+                "project_name": settings.PROJECT_NAME,
+            }
+
+            html_content, text_content = self._render_template("welcome", context)
+
+            return await self._send_email_sendgrid(
+                to_email=user_email,
+                subject=f"Welcome to {settings.PROJECT_NAME}",
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error sending welcome email: {e}")
+            return False
+
+    async def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        html: Optional[str] = None,
+        text: Optional[str] = None,
+        template_name: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Generic send wrapper: either pass raw html/text or a template_name with context."""
+        try:
+            if template_name:
+                ctx = context or {}
+                html_content, text_content = self._render_template(template_name, ctx)
+            else:
+                if html is None or text is None:
+                    raise ValueError(
+                        "html and text must be provided when template_name is not used"
+                    )
+                html_content, text_content = html, text
+
+            return await self._send_email_sendgrid(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content,
+            )
+        except Exception as e:
+            logger.error(f"Error in send_email wrapper: {e}")
             return False
 
 

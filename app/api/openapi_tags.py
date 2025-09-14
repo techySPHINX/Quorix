@@ -136,16 +136,16 @@ common_responses = {
                 "examples": {
                     "missing_token": {
                         "summary": "Missing Authentication",
-                        "value": {"detail": "Not authenticated"}
+                        "value": {"detail": "Not authenticated"},
                     },
                     "invalid_token": {
                         "summary": "Invalid Token",
-                        "value": {"detail": "Could not validate credentials"}
+                        "value": {"detail": "Could not validate credentials"},
                     },
                     "expired_token": {
                         "summary": "Expired Token",
-                        "value": {"detail": "Token has expired"}
-                    }
+                        "value": {"detail": "Token has expired"},
+                    },
                 }
             }
         },
@@ -153,18 +153,12 @@ common_responses = {
     403: {
         "description": "Forbidden",
         "content": {
-            "application/json": {
-                "example": {"detail": "Insufficient permissions"}
-            }
+            "application/json": {"example": {"detail": "Insufficient permissions"}}
         },
     },
     404: {
         "description": "Not Found",
-        "content": {
-            "application/json": {
-                "example": {"detail": "Resource not found"}
-            }
-        },
+        "content": {"application/json": {"example": {"detail": "Resource not found"}}},
     },
     422: {
         "description": "Validation Error",
@@ -175,7 +169,7 @@ common_responses = {
                         {
                             "loc": ["body", "field_name"],
                             "msg": "field required",
-                            "type": "value_error.missing"
+                            "type": "value_error.missing",
                         }
                     ]
                 }
@@ -193,9 +187,7 @@ common_responses = {
     500: {
         "description": "Internal Server Error",
         "content": {
-            "application/json": {
-                "example": {"detail": "Internal server error"}
-            }
+            "application/json": {"example": {"detail": "Internal server error"}}
         },
     },
 }
@@ -207,7 +199,7 @@ security_schemes = {
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": """
-JWT (JSON Web Token) authentication. 
+JWT (JSON Web Token) authentication.
 
 **How to authenticate:**
 1. Login via `/auth/login/access-token` to get your JWT token
