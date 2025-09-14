@@ -1,0 +1,665 @@
+{
+  "info": {
+    "name": "Evently API - Full Collection",
+    "_postman_id": "evently-collection",
+    "description": "Full Postman Collection (v2.1) for Evently API. Uses environment variables: {{base_url}}, {{api_prefix}}, {{access_token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login - access token (form)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "user@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "securepassword123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/auth/login/access-token",
+              "host": ["{{base_url}}{{api_prefix}}/auth/login/access-token"]
+            }
+          },
+          "response": [
+            {
+              "name": "Example success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "access_token": "eyJ...",
+                "refresh_token": "eyJ...",
+                "token_type": "bearer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/auth/login/refresh-token"
+            }
+          },
+          "response": [
+            {
+              "name": "Example success",
+              "status": "OK",
+              "code": 200,
+              "_body": { "access_token": "eyJ...", "token_type": "bearer" }
+            }
+          ]
+        },
+        {
+          "name": "Test token",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/auth/login/test-token" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 1,
+                "email": "user@example.com",
+                "full_name": "Test User",
+                "is_active": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/auth/logout" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "message": "Logout successful" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "List events",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [
+                {
+                  "id": 123,
+                  "name": "Tech Conference 2024",
+                  "start_date": "2024-06-15T09:00:00Z",
+                  "end_date": "2024-06-15T18:00:00Z",
+                  "location": "Convention Center",
+                  "price": 299.99,
+                  "capacity": 500,
+                  "organizer_id": 1,
+                  "available_tickets": 200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Get event by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/123" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 123,
+                "name": "Tech Conference 2024",
+                "description": "Annual conference",
+                "start_date": "2024-06-15T09:00:00Z",
+                "end_date": "2024-06-15T18:00:00Z",
+                "location": "Convention Center",
+                "price": 299.99,
+                "capacity": 500,
+                "organizer_id": 1,
+                "available_tickets": 200
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create event (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Conference 2024\",\n  \"description\": \"Annual technology conference\",\n  \"start_date\": \"2024-06-15T09:00:00Z\",\n  \"end_date\": \"2024-06-15T18:00:00Z\",\n  \"location\": \"Convention Center\",\n  \"price\": 299.99,\n  \"capacity\": 500\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/" }
+          },
+          "response": [
+            {
+              "name": "Example created",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 124,
+                "name": "Tech Conference 2024",
+                "start_date": "2024-06-15T09:00:00Z",
+                "end_date": "2024-06-15T18:00:00Z",
+                "location": "Convention Center",
+                "price": 299.99,
+                "capacity": 500,
+                "organizer_id": 1,
+                "available_tickets": 500
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update event (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Event Name\",\n  \"description\": \"New description\",\n  \"start_date\": \"2024-07-15T10:00:00Z\",\n  \"end_date\": \"2024-07-15T18:00:00Z\",\n  \"location\": \"New Venue\",\n  \"price\": 349.99,\n  \"capacity\": 600\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/123" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "id": 123, "name": "Updated Event Name" }
+            }
+          ]
+        },
+        {
+          "name": "Delete event (admin)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/123" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "id": 123, "name": "Updated Event Name" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create booking",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": 123,\n  \"number_of_tickets\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/bookings/" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 555,
+                "event_id": 123,
+                "number_of_tickets": 2,
+                "user_id": 10,
+                "booked_at": "2024-05-01T12:00:00Z",
+                "status": "CONFIRMED",
+                "user": {
+                  "id": 10,
+                  "email": "user@example.com",
+                  "full_name": "Test User"
+                },
+                "event": { "id": 123, "name": "Tech Conference 2024" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "List bookings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/bookings/" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [{ "id": 555, "event_id": 123, "number_of_tickets": 2 }]
+            }
+          ]
+        },
+        {
+          "name": "Get booking",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/bookings/555" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "id": 555, "event_id": 123, "number_of_tickets": 2 }
+            }
+          ]
+        },
+        {
+          "name": "Cancel booking",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/bookings/555/cancel" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "id": 555, "status": "CANCELLED" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List users (admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/users/" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [
+                {
+                  "id": 10,
+                  "email": "user@example.com",
+                  "full_name": "Test User"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/users/10" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 10,
+                "email": "user@example.com",
+                "full_name": "Test User"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get notifications",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/notifications/" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [
+                {
+                  "id": 1,
+                  "user_id": 10,
+                  "title": "Booking Confirmed",
+                  "message": "Your booking is confirmed",
+                  "is_read": false,
+                  "created_at": "2024-05-01T12:00:00Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Get notification",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/notifications/1" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 1,
+                "user_id": 10,
+                "title": "Booking Confirmed",
+                "message": "Your booking is confirmed"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark notification read",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/notifications/1/mark-read"
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "message": "Notification marked as read",
+                "notification": { "id": 1, "is_read": true }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark all read",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/notifications/mark-all-read"
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "message": "Marked 3 notifications as read" }
+            }
+          ]
+        },
+        {
+          "name": "Delete notification",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/notifications/1" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "message": "Notification deleted successfully" }
+            }
+          ]
+        },
+        {
+          "name": "Admin send notification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 10,\n  \"notification_type\": \"INFO\",\n  \"title\": \"Maintenance\",\n  \"message\": \"Planned maintenance at midnight\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/notifications/admin/send-notification"
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "message": "Notification sent" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Waitlist",
+      "item": [
+        {
+          "name": "Join waitlist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"number_of_tickets\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/123/join" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "id": 42,
+                "event_id": 123,
+                "user_id": 10,
+                "number_of_tickets": 2,
+                "status": "WAITING"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my waitlist",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/my-waitlist" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [{ "id": 42, "event_id": 123, "number_of_tickets": 2 }]
+            }
+          ]
+        },
+        {
+          "name": "Leave waitlist",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/42" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "message": "Successfully removed from waitlist" }
+            }
+          ]
+        },
+        {
+          "name": "Event waitlist stats (admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/123/stats" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": { "total": 50, "waiting": 45 }
+            }
+          ]
+        },
+        {
+          "name": "Get event waitlist (admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/123/list" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [{ "id": 42, "user_id": 10, "number_of_tickets": 2 }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Dashboard (admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/analytics/dashboard" }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "total_events": 120,
+                "total_bookings": 3500,
+                "revenue": 123456.78
+              }
+            }
+          ]
+        },
+        {
+          "name": "Popular events (admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/analytics/popular-events?limit=5"
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": [
+                {
+                  "event": { "id": 123, "name": "Tech Conference 2024" },
+                  "booking_count": 500,
+                  "total_revenue": 149995.0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Event performance (admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/analytics/event-performance/123"
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "status": "OK",
+              "code": 200,
+              "_body": {
+                "event_id": 123,
+                "tickets_sold": 480,
+                "revenue": 143995.0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
