@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,20 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.api import deps
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.waitlist import Waitlist, WaitlistCreate
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
-@router.post("/{event_id}/join", response_model=Waitlist)
+@router.post("/{event_id}/join", response_model=Waitlist)  # type: ignore[misc]
 async def join_event_waitlist(
     *,
     event_id: int,
     waitlist_in: WaitlistCreate,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> Waitlist:
     """
     Join waitlist for a sold-out event.
     """
@@ -44,25 +46,25 @@ async def join_event_waitlist(
     return waitlist_entry
 
 
-@router.get("/my-waitlist", response_model=List[Waitlist])
+@router.get("/my-waitlist", response_model=List[Waitlist])  # type: ignore[misc]
 async def get_my_waitlist(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
     skip: int = 0,
     limit: int = 100,
-):
+) -> list[Waitlist]:
     """
     Get current user's waitlist entries.
     """
     return await crud.waitlist.get_user_waitlist(db, current_user.id, skip, limit)
 
 
-@router.delete("/{waitlist_id}")
+@router.delete("/{waitlist_id}")  # type: ignore[misc]
 async def leave_waitlist(
     waitlist_id: int,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> dict[str, str]:
     """
     Leave a waitlist.
     """
@@ -81,17 +83,15 @@ async def leave_waitlist(
     return {"message": "Successfully removed from waitlist"}
 
 
-@router.get("/{event_id}/stats")
+@router.get("/{event_id}/stats")  # type: ignore[misc]
 async def get_event_waitlist_stats(
     event_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
-):
+    current_user: User = Depends(deps.require_role(UserRole.ADMIN)),
+) -> dict[str, int]:
     """
     Get waitlist statistics for an event (admin only).
     """
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Verify event exists
     event = await crud.event.get_event(db, event_id)
@@ -101,12 +101,12 @@ async def get_event_waitlist_stats(
     return await crud.waitlist.get_waitlist_stats(db, event_id)
 
 
-@router.get("/{event_id}/list")
+@router.get("/{event_id}/list")  # type: ignore[misc]
 async def get_event_waitlist(
     event_id: int,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> list[Waitlist]:
     """
     Get waitlist for an event (admin only).
     """

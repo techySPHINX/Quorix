@@ -11,13 +11,13 @@ from app.schemas.user import User as UserSchema
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserSchema])
+@router.get("/", response_model=List[UserSchema])  # type: ignore[misc]
 async def read_users(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
     current_user: UserModel = Depends(deps.get_current_active_user),
-):
+) -> list[UserSchema]:
     """
     Retrieve users.
     """
@@ -27,13 +27,13 @@ async def read_users(
     return users
 
 
-@router.get("/{user_id}", response_model=UserSchema)
+@router.get("/{user_id}", response_model=UserSchema)  # type: ignore[misc]
 async def read_user(
     *,
     db: AsyncSession = Depends(deps.get_db),
     user_id: int,
     current_user: UserModel = Depends(deps.get_current_active_user),
-):
+) -> UserSchema:
     """
     Get user by ID.
     """

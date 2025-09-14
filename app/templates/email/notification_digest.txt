@@ -1,0 +1,24 @@
+Daily Notification Digest - {{ project_name }}
+
+Hi {{ user_name }},
+
+You have {{ notification_count }} unread notifications:
+
+{% for notification in notifications %}
+• {{ notification.title }}
+  {{ notification.message }}
+  {{ notification.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+
+{% endfor %}
+
+{% if notification_count > notifications|length %}
++ {{ notification_count - notifications|length }} more notifications
+
+{% endif %}
+View all notifications: {{ dashboard_url }}/notifications
+
+---
+This digest was sent because you have digest notifications enabled.
+Update preferences: {{ dashboard_url }}/notifications/preferences
+
+© 2025 {{ project_name }}. All rights reserved.

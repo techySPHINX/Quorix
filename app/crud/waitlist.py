@@ -10,7 +10,8 @@ from app.schemas.waitlist import WaitlistCreate
 
 async def get_waitlist_entry(db: AsyncSession, waitlist_id: int) -> Optional[Waitlist]:
     result = await db.execute(select(Waitlist).filter(Waitlist.id == waitlist_id))
-    return result.scalars().first()
+    first: Optional[Waitlist] = result.scalars().first()
+    return first
 
 
 async def get_waitlist_by_user_event(
@@ -23,7 +24,8 @@ async def get_waitlist_by_user_event(
             Waitlist.status == WaitlistStatus.WAITING,
         )
     )
-    return result.scalars().first()
+    first: Optional[Waitlist] = result.scalars().first()
+    return first
 
 
 async def get_event_waitlist(
@@ -34,7 +36,7 @@ async def get_event_waitlist(
         .filter(Waitlist.event_id == event_id, Waitlist.status == status)
         .order_by(Waitlist.joined_at.asc())
     )
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def join_waitlist(
@@ -49,7 +51,7 @@ async def join_waitlist(
         **waitlist.model_dump(),
         user_id=user_id,
         joined_at=datetime.utcnow(),
-        status=WaitlistStatus.WAITING
+        status=WaitlistStatus.WAITING,
     )
     db.add(db_waitlist)
     await db.commit()
@@ -100,10 +102,10 @@ async def get_user_waitlist(
         .offset(skip)
         .limit(limit)
     )
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
-async def get_waitlist_stats(db: AsyncSession, event_id: int) -> dict:
+async def get_waitlist_stats(db: AsyncSession, event_id: int) -> dict[str, int]:
     """Get waitlist statistics for an event"""
     result = await db.execute(
         select(
@@ -115,6 +117,6 @@ async def get_waitlist_stats(db: AsyncSession, event_id: int) -> dict:
     )
     stats = result.first()
     return {
-        "total_waiting": stats.total_waiting or 0,
-        "total_tickets_needed": stats.total_tickets_needed or 0,
+        "total_waiting": stats.total_waiting if stats else 0,
+        "total_tickets_needed": stats.total_tickets_needed if stats else 0,
     }

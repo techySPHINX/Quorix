@@ -1,0 +1,22 @@
+[flake8]
+max-line-length = 130
+extend-ignore = E203, E266, E501, W503, F403, F401, E402, F841
+max-complexity = 18
+select = B,C,E,F,W,T4,B9
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .tox,
+    .mypy_cache,
+    .pytest_cache,
+    *.egg-info,
+    build,
+    dist,
+    alembic/versions
+
+per-file-ignores =
+    __init__.py:F401
+    */config.py:E501
+    alembic/versions/*.py:E501,F401,E402

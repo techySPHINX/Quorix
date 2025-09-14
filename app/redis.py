@@ -1,4 +1,4 @@
-import redis.asyncio as redis  # type: ignore
+import redis.asyncio as redis
 
 from .core.config import settings
 

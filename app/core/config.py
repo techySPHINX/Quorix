@@ -1,37 +1,46 @@
 import secrets
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import AnyHttpUrl, BaseSettings, EmailStr, HttpUrl, field_validator
+from pydantic import AnyHttpUrl, EmailStr, HttpUrl, ValidationInfo, field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # API & Security
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
+
+    # Server
     SERVER_NAME: str
     SERVER_HOST: AnyHttpUrl
-    # BACKEND_CORS_ORIGINS is a JSON-formatted list of origins
-    # e.g: '["http://localhost", "http://localhost:4200", "http://localhost:3000", \
-    # "http://localhost:8080", "https://localhost", "https://localhost:4200", \
-    # "https://localhost:3000", "https://localhost:8080"]'
+
+    # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")  # type: ignore[misc]
     @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
+    def assemble_cors_origins(
+        cls, v: Union[str, List[str]], info: ValidationInfo
+    ) -> Union[str, List[str]]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+        if isinstance(v, list):
             return v
-        raise ValueError(v)
+        if isinstance(v, str):
+            return [v]
+        raise ValueError(f"Invalid CORS origins: {v}")
 
+    # Project
     PROJECT_NAME: str
     SENTRY_DSN: Optional[HttpUrl] = None
+
+    # Database & Redis
     SQLALCHEMY_DATABASE_URI: str
     REDIS_URL: str
 
-    # Celery Configuration
+    # Celery
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
     CELERY_TASK_SERIALIZER: str = "json"
@@ -44,87 +53,62 @@ class Settings(BaseSettings):
         "app.tasks.notify_*": {"queue": "notifications"},
     }
 
-    # SendGrid Email Configuration
+    # Email (SendGrid)
     SENDGRID_API_KEY: Optional[str] = None
-    SENDGRID_FROM_EMAIL: Optional[str] = None
+    SENDGRID_FROM_EMAIL: Optional[EmailStr] = None
     SENDGRID_FROM_NAME: Optional[str] = None
 
+    @field_validator("SENDGRID_FROM_NAME", mode="before")  # type: ignore[misc]
+    @classmethod
+    def get_sendgrid_from_name(
+        cls, v: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        if v:
+            return v
+        values: Dict[str, Any] = info.data if info.data else {}
+        return str(values.get("PROJECT_NAME", "Evently"))
+
     # Email Templates
-    EMAIL_TEMPLATES_ENABLED: bool = True
-
-    # Legacy SMTP (fallback)
-    AZURE_SERVICE_BUS_CONNECTION_STRING: Optional[str] = None
-
-    @field_validator("CELERY_BROKER_URL", mode="before")
-    @classmethod
-    def assemble_celery_broker_url(
-        cls, v: Optional[str], values: Dict[str, Any]
-    ) -> Any:
-        if isinstance(v, str):
-            return v
-        if values.get("AZURE_SERVICE_BUS_CONNECTION_STRING"):
-            return values["AZURE_SERVICE_BUS_CONNECTION_STRING"]
-        return "redis://localhost:6379/0"  # Fallback or default if not provided
-
-    @field_validator("CELERY_RESULT_BACKEND", mode="before")
-    @classmethod
-    def assemble_celery_result_backend(
-        cls, v: Optional[str], values: Dict[str, Any]
-    ) -> Any:
-        if isinstance(v, str):
-            return v
-        if values.get("REDIS_URL"):
-            return values["REDIS_URL"]
-        return "redis://localhost:6379/0"  # Fallback or default if not provided
-
-    SMTP_TLS: bool = True
-    SMTP_PORT: Optional[int] = None
-    SMTP_HOST: Optional[str] = None
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    EMAILS_FROM_EMAIL: Optional[EmailStr] = None
-    EMAILS_FROM_NAME: Optional[str] = None
-
-    @field_validator("EMAILS_FROM_NAME")
-    @classmethod
-    def get_project_name(cls, v: Optional[str], values: Dict[str, Any]) -> str:
-        if not v:
-            return values["PROJECT_NAME"]
-        return v
-
-    @field_validator("SENDGRID_FROM_NAME", mode="before")
-    @classmethod
-    def get_sendgrid_from_name(cls, v: Optional[str], values: Dict[str, Any]) -> str:
-        if not v:
-            return values.get("PROJECT_NAME", "Evently")
-        return v
-
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
-    EMAIL_TEMPLATES_DIR: str = "/app/email-templates/build"
+    EMAIL_TEMPLATES_DIR: str = "app/templates/email"
     EMAILS_ENABLED: bool = False
 
-    @field_validator("EMAILS_ENABLED", mode="before")
+    @field_validator("EMAILS_ENABLED", mode="before")  # type: ignore[misc]
     @classmethod
-    def get_emails_enabled(cls, v: bool, values: Dict[str, Any]) -> bool:
-        # Prefer SendGrid, fallback to SMTP
-        sendgrid_enabled = bool(
+    def get_emails_enabled(cls, v: bool, info: ValidationInfo) -> bool:
+        values: Dict[str, Any] = info.data if info.data else {}
+        return bool(
             values.get("SENDGRID_API_KEY") and values.get("SENDGRID_FROM_EMAIL")
         )
-        smtp_enabled = bool(
-            values.get("SMTP_HOST")
-            and values.get("SMTP_PORT")
-            and values.get("EMAILS_FROM_EMAIL")
-        )
-        return sendgrid_enabled or smtp_enabled
 
-    EMAIL_TEST_USER: EmailStr = "test@example.com"  # type: ignore
+    EMAIL_TEST_USER: EmailStr = "test@example.com"
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
     USERS_OPEN_REGISTRATION: bool = False
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    # Notifications
+    NOTIFICATIONS_ENABLED: bool = True
+    NOTIFICATION_RETENTION_DAYS: int = 90
+    NOTIFICATION_BATCH_SIZE: int = 100
+
+    # Email Notification System
+    EMAIL_NOTIFICATION_RETRIES: int = 3
+    EMAIL_BATCH_SIZE: int = 10
+    EMAIL_BATCH_DELAY: float = 1.0
+
+    # Push Notifications (future)
+    PUSH_NOTIFICATIONS_ENABLED: bool = False
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    # Environment
+    ENVIRONMENT: str = "production"
+
+    model_config = {
+        "case_sensitive": True,
+        "env_file": ".env",
+    }
 
 
-settings = Settings()
+settings: Settings = Settings()

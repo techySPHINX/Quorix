@@ -1,0 +1,19 @@
+Welcome to {{ project_name }}!
+
+Welcome aboard, {{ user_name }}!
+
+Thank you for joining {{ project_name }}. We're excited to help you discover and book amazing events.
+
+Here's what you can do with your account:
+- Browse and book tickets for events
+- Join waitlists for sold-out events  
+- Manage your bookings and preferences
+- Receive notifications about events you're interested in
+
+Get started by visiting your dashboard:
+{{ dashboard_url }}
+
+If you have any questions, feel free to contact our support team.
+
+---
+This is an automated email from {{ project_name }}. Please do not reply.

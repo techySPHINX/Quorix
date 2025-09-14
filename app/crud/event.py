@@ -2,19 +2,21 @@ from typing import Optional
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.event import Event
 from app.schemas.event import EventCreate
 
 
-async def get_event(db: AsyncSession, event_id: int):
+async def get_event(db: AsyncSession, event_id: int) -> Optional[Event]:
     result = await db.execute(select(Event).filter(Event.id == event_id))
-    return result.scalars().first()
+    first: Optional[Event] = result.scalars().first()
+    return first
 
 
-async def get_events(db: AsyncSession, skip: int = 0, limit: int = 100):
+async def get_events(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[Event]:
     result = await db.execute(select(Event).offset(skip).limit(limit))
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def get_events_filtered(
@@ -25,11 +27,11 @@ async def get_events_filtered(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     available_only: bool = False,
-):
+) -> list[Event]:
     """Get events with optional filtering"""
     query = select(Event)
 
-    filters = []
+    filters: list[ColumnElement[bool]] = []
     if location:
         filters.append(Event.location.ilike(f"%{location}%"))
     if min_price is not None:
@@ -43,10 +45,12 @@ async def get_events_filtered(
         query = query.filter(and_(*filters))
 
     result = await db.execute(query.offset(skip).limit(limit))
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
-async def create_event(db: AsyncSession, event: EventCreate, organizer_id: int):
+async def create_event(
+    db: AsyncSession, event: EventCreate, organizer_id: int
+) -> Event:
     db_event = Event(
         **event.model_dump(),
         organizer_id=organizer_id,
@@ -58,7 +62,9 @@ async def create_event(db: AsyncSession, event: EventCreate, organizer_id: int):
     return db_event
 
 
-async def update_event(db: AsyncSession, event_id: int, event: EventCreate):
+async def update_event(
+    db: AsyncSession, event_id: int, event: EventCreate
+) -> Optional[Event]:
     db_event = await get_event(db, event_id)
     if db_event:
         for key, value in event.model_dump(exclude_unset=True).items():
@@ -68,7 +74,7 @@ async def update_event(db: AsyncSession, event_id: int, event: EventCreate):
     return db_event
 
 
-async def delete_event(db: AsyncSession, event_id: int):
+async def delete_event(db: AsyncSession, event_id: int) -> Optional[Event]:
     db_event = await get_event(db, event_id)
     if db_event:
         await db.delete(db_event)

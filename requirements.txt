@@ -13,9 +13,12 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
 alembic==1.13.1
 
-emails==0.6
-jinja2==3.1.4
+# Email dependencies (production-grade SendGrid)
 sendgrid==6.11.0
+jinja2==3.1.4
+
+# Legacy SMTP dependencies (deprecated)
+# aiosmtplib==3.0.1
 
 # Development and code quality tools
 pre-commit

@@ -11,13 +11,13 @@ from app.schemas.booking import Booking, BookingCreate
 router = APIRouter()
 
 
-@router.post("/", response_model=Booking)
+@router.post("/", response_model=Booking)  # type: ignore[misc]
 async def create_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
     booking_in: BookingCreate,
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> Booking:
     """
     Create new booking. If event is sold out, suggests joining waitlist.
     """
@@ -26,16 +26,15 @@ async def create_booking(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    booking = await crud.booking.create_booking(
-        db=db, booking=booking_in, user_id=current_user.id
+    booking, message = await crud.booking.create_booking_atomic(
+        db=db, booking_data=booking_in, user_id=current_user.id
     )
-
     if not booking:
         # Event is sold out, suggest waitlist
         raise HTTPException(
             status_code=400,
             detail={
-                "message": "Not enough tickets available",
+                "message": message or "Not enough tickets available",
                 "available_tickets": event.available_tickets,
                 "requested_tickets": booking_in.number_of_tickets,
                 "suggestion": (
@@ -44,7 +43,6 @@ async def create_booking(
                 ),
             },
         )
-
     # Send confirmation email
     from app.tasks import send_booking_confirmation_email
 
@@ -52,32 +50,34 @@ async def create_booking(
     return booking
 
 
-@router.get("/", response_model=List[Booking])
+@router.get("/", response_model=List[Booking])  # type: ignore[misc]
 async def read_bookings(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> List[Booking]:
     """
     Retrieve bookings. Regular users see only their own bookings.
     """
     if current_user.is_superuser:
-        bookings = await crud.booking.get_bookings(db, skip=skip, limit=limit)
+        bookings, _ = await crud.booking.get_bookings_with_pagination(
+            db, skip=skip, limit=limit
+        )
     else:
-        bookings = await crud.booking.get_user_bookings(
-            db, current_user.id, skip=skip, limit=limit
+        bookings = await crud.booking.get_user_booking_history(
+            db, current_user.id, limit=limit, skip=skip
         )
     return bookings
 
 
-@router.get("/{booking_id}", response_model=Booking)
+@router.get("/{booking_id}", response_model=Booking)  # type: ignore[misc]
 async def read_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
     booking_id: int,
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> Booking:
     """
     Get booking by ID.
     """
@@ -89,13 +89,13 @@ async def read_booking(
     return booking
 
 
-@router.put("/{booking_id}/cancel", response_model=Booking)
+@router.put("/{booking_id}/cancel", response_model=Booking)  # type: ignore[misc]
 async def cancel_booking(
     *,
     db: AsyncSession = Depends(deps.get_db),
     booking_id: int,
     current_user: User = Depends(deps.get_current_active_user),
-):
+) -> Booking:
     """
     Cancel a booking.
     """
@@ -104,11 +104,16 @@ async def cancel_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
     if not current_user.is_superuser and booking.user_id != current_user.id:
         raise HTTPException(status_code=400, detail="Not enough permissions")
-    booking = await crud.booking.cancel_booking(db=db, booking_id=booking_id)
-
+    # Use cancel_booking_atomic and handle tuple return
+    booking, message = await crud.booking.cancel_booking_atomic(
+        db=db, booking_id=booking_id, user_id=current_user.id
+    )
+    if not booking:
+        raise HTTPException(
+            status_code=400, detail=message or "Unable to cancel booking"
+        )
     # Send cancellation email
     from app.tasks import send_booking_cancellation_email
 
     send_booking_cancellation_email.delay(current_user.id, booking.id)
-
     return booking
