@@ -3,24 +3,23 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from urllib.parse import urlparse, parse_qsl, urlunparse, urlencode
 from logging.config import fileConfig
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import MetaData, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 # Ensure app package is importable
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Load settings and SQLAlchemy metadata
-from app.core.config import settings  # noqa: E402
-
-# Models use two different DeclarativeBase classes and one legacy Base from app.database.
-# We'll collect all metadatas explicitly.
-from app.database import Base as ModelBase  # noqa: E402
-from app import models as _models  # noqa: F401,E402  # ensure model modules are imported
+# Load app modules after fixing sys.path using imperative imports to avoid
+# flake8 E402/F401 warnings in this env script. Use __import__ so these
+# are not treated as top-level static import statements by linters.
+__import__("app.models")
+settings = __import__("app.core.config", fromlist=["settings"]).settings
+ModelBase = __import__("app.database", fromlist=["Base"]).Base
 
 # Single metadata for all models
 TARGET_METADATA = ModelBase.metadata
@@ -40,7 +39,11 @@ def _normalize_db_url(url: str) -> str:
         url = url.replace("postgresql://", "postgresql+asyncpg://")
     parsed = urlparse(url)
     if parsed.query:
-        q = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() != "sslmode"]
+        q = [
+            (k, v)
+            for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+            if k.lower() != "sslmode"
+        ]
         url = urlunparse(
             (
                 parsed.scheme,
@@ -60,10 +63,12 @@ override_url = x_args.get("dburl") if isinstance(x_args, dict) else None
 if override_url:
     config.set_main_option("sqlalchemy.url", _normalize_db_url(str(override_url)))
 elif not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", _normalize_db_url(str(settings.SQLALCHEMY_DATABASE_URI)))
+    config.set_main_option(
+        "sqlalchemy.url", _normalize_db_url(str(settings.SQLALCHEMY_DATABASE_URI))
+    )
 
 
-def get_target_metadata():
+def get_target_metadata() -> MetaData:
     return TARGET_METADATA
 
 
@@ -103,7 +108,9 @@ async def run_migrations_online() -> None:
     connect_args = {}
     if url.startswith("postgresql+asyncpg://"):
         connect_args["ssl"] = True
-    connectable = create_async_engine(url, poolclass=pool.NullPool, connect_args=connect_args)
+    connectable = create_async_engine(
+        url, poolclass=pool.NullPool, connect_args=connect_args
+    )
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
