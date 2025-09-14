@@ -39,10 +39,12 @@ def _normalize_db_url(url: str) -> str:
         url = url.replace("postgresql://", "postgresql+asyncpg://")
     parsed = urlparse(url)
     if parsed.query:
+        # Drop query params that asyncpg.connect doesn't accept as kwargs
+        unsupported = {"sslmode", "channel_binding"}
         q = [
             (k, v)
             for k, v in parse_qsl(parsed.query, keep_blank_values=True)
-            if k.lower() != "sslmode"
+            if k.lower() not in unsupported
         ]
         url = urlunparse(
             (
