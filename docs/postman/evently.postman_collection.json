@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Evently API - Full Collection",
-    "_postman_id": "evently-collection",
-    "description": "Full Postman Collection (v2.1) for Evently API. Uses environment variables: {{base_url}}, {{api_prefix}}, {{access_token}}.",
+    "name": "Quorix API - Full Collection",
+    "_postman_id": "quorix-collection",
+    "description": "Full Postman Collection (v2.1) for Quorix API. Uses environment variables: {{base_url}}, {{api_prefix}}, {{access_token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -49,6 +49,18 @@
               "host": ["{{base_url}}{{api_prefix}}/auth/login/access-token"]
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has access_token', function () { var json = pm.response.json(); pm.expect(json).to.have.property('access_token'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example success",
@@ -77,6 +89,18 @@
               "raw": "{{base_url}}{{api_prefix}}/auth/login/refresh-token"
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has access_token', function () { var json = pm.response.json(); pm.expect(json).to.have.property('access_token'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example success",
@@ -92,6 +116,18 @@
             "method": "POST",
             "url": { "raw": "{{base_url}}{{api_prefix}}/auth/login/test-token" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has email', function () { var json = pm.response.json(); pm.expect(json).to.have.property('email'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -112,6 +148,18 @@
             "method": "POST",
             "url": { "raw": "{{base_url}}{{api_prefix}}/auth/logout" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Logout message present', function () { var json = pm.response.json(); pm.expect(json).to.have.property('message'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -132,6 +180,18 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}{{api_prefix}}/events/" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array', function () { var json = pm.response.json(); pm.expect(Array.isArray(json)).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -159,6 +219,18 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}{{api_prefix}}/events/123" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has id and name', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); pm.expect(json).to.have.property('name'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -191,6 +263,18 @@
             },
             "url": { "raw": "{{base_url}}{{api_prefix}}/events/" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has id', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example created",
@@ -222,6 +306,18 @@
             },
             "url": { "raw": "{{base_url}}{{api_prefix}}/events/123" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Updated has id', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -263,6 +359,18 @@
             },
             "url": { "raw": "{{base_url}}{{api_prefix}}/bookings/" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Booking has id', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -341,6 +449,18 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}{{api_prefix}}/users/" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array', function () { var json = pm.response.json(); pm.expect(Array.isArray(json)).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -386,6 +506,18 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}{{api_prefix}}/notifications/" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array', function () { var json = pm.response.json(); pm.expect(Array.isArray(json)).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -490,6 +622,18 @@
               "raw": "{{base_url}}{{api_prefix}}/notifications/admin/send-notification"
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has message', function () { var json = pm.response.json(); pm.expect(json).to.have.property('message'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -516,6 +660,18 @@
             },
             "url": { "raw": "{{base_url}}{{api_prefix}}/waitlist/123/join" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has id', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -602,6 +758,18 @@
             "method": "GET",
             "url": { "raw": "{{base_url}}{{api_prefix}}/analytics/dashboard" }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has total_events', function () { var json = pm.response.json(); pm.expect(json).to.have.property('total_events'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "response": [
             {
               "name": "Example",
@@ -658,6 +826,75 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Admin Variants",
+      "item": [
+        {
+          "name": "Admin - Create event",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin Event\",\n  \"start_date\": \"2025-01-01T09:00:00Z\",\n  \"end_date\": \"2025-01-01T18:00:00Z\",\n  \"location\": \"HQ\",\n  \"price\": 0.0,\n  \"capacity\": 100\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/events/" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Admin - Analytics Dashboard",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}{{api_prefix}}/analytics/dashboard" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
         }
       ]
     }
