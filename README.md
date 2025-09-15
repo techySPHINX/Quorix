@@ -1,110 +1,154 @@
-# Quorix
+<!-- <p align="center">
+  <a href="https://github.com/techySPHINX/Quorix" target="blank">
+  <img src="https://i.imgur.com/3kQwQwC.png" width="120" alt="Quorix Logo" />
+  </a>
+</p> -->
 
-Quorix is an event booking and notification microservice built with FastAPI, SQLAlchemy and Celery.
+<h1 align="center">
+  Quorix
+</h1>
 
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fastapi?label=python)](https://www.python.org/)
-[![pytest](https://img.shields.io/badge/tests-pytest-blue)](https://docs.pytest.org/)
+<p align="center">
+  An event booking , waitlist, advanced analytics and notification microservice engineered product.
+<p>
 
-## Quick overview
+<p align="center">
+    <a href="https://github.com/techySPHINX/Quorix" target="blank">
+     <img alt="License" src="https://img.shields.io/github/license/techySPHINX/Quorix?style=flat-square&logo=opensourceinitiative&logoColor=white&color=blue">
+    </a>
+    <a href="https://github.com/techySPHINX/Quorix" target="blank">
+     <img src="https://img.shields.io/github/last-commit/techySPHINX/Quorix?style=flat-square&logo=git&logoColor=white&color=blue" alt="Last Commit" />
+    </a>
+    <a href="https://github.com/techySPHINX/Quorix/issues" target="blank">
+     <img src="https://img.shields.io/github/issues/techySPHINX/Quorix?style=flat-square&logo=github&color=blue" alt="Open Issues" />
+    </a>
+    <a href="https://github.com/techySPHINX/Quorix/pulls" target="blank">
+     <img src="https://img.shields.io/github/issues-pr/techySPHINX/Quorix?style=flat-square&logo=github&color=blue" alt="Open PRs" />
+    </a>
+</p>
 
-- API built with FastAPI
-- SQLAlchemy ORM for data models and migrations via Alembic
-- Celery for background task processing
-- Redis (recommended) for caching and Celery broker (optional)
+**Quorix** is a robust and scalable microservice for managing event bookings, user notifications, and more. It's built with **FastAPI**, **SQLAlchemy**, and **Celery** to provide a high-performance, asynchronous, and reliable system.
 
-## System design summary
+## ✨ Key Features
 
-This repository includes a detailed system design document covering concurrency controls, database modeling, scalability patterns, API design, and optional features (waitlists, seat-level booking, notifications, analytics).
+- **🚀 Fast & Asynchronous:** Built on FastAPI and Starlette for high-performance, non-blocking I/O.
+- **🎟️ Event & Booking Management:** Create, manage, and book events with ease.
+- **🔔 Notification System:** Keep users informed with email notifications for bookings, cancellations, and reminders.
+- **👥 User Authentication:** Secure user authentication and authorization using JWT.
+- **⏳ Waitlist Functionality:** Automatically manage waitlists for fully booked events.
+- **📊 Analytics:** (Optional) Endpoints for gathering insights on event and booking metrics.
+- **⚙️ Background Tasks:** Offload tasks like sending emails to a Celery worker for a responsive API.
+- **🗄️ Database Migrations:** Use Alembic to manage database schema changes.
 
-See [System Design](docs/SYSTEM_DESIGN.md) for the full design, diagrams, and engineering tradeoffs.
+## 🛠️ Tech Stack
 
-## Table of contents
+- **Backend:** [FastAPI](https://fastapi.tiangolo.com/), [Python 3.11+](https://www.python.org/)
+- **ORM:** [SQLAlchemy](https://www.sqlalchemy.org/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) (recommended), SQLite (for testing)
+- **Async Tasks:** [Celery](https://docs.celeryq.dev/en/stable/)
+- **Caching & Message Broker:** [Redis](https://redis.io/)
+- **Testing:** [Pytest](https://docs.pytest.org/)
+- **Linting & Formatting:** [Ruff](https://beta.ruff.rs/docs/), [Black](https://github.com/psf/black), [MyPy](http://mypy-lang.org/)
 
-- Installation
-- Environment
-- Running locally
-- Running tests
-- Contribution guide
-- Project structure
-- Troubleshooting
+## 🏛️ System Design
 
-## Installation
+This repository includes a detailed system design document covering concurrency controls, database modeling, scalability patterns, API design, and optional features.
 
-Prerequisites
+**➡️ [View the full System Design Document](docs/SYSTEM_DESIGN.md)**
 
-- Python 3.11+ (3.12 compatible)
-- Redis (optional for local dev)
+## 🚀 Getting Started
 
-Create a virtual environment and install dependencies:
+### Prerequisites
 
-```powershell
-python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt
+- Python 3.11+
+- [Poetry](https://python-poetry.org/docs/#installation) for dependency management
+- [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/) (for running with PostgreSQL and Redis)
+
+### Installation
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/techySPHINX/Quorix.git
+    cd evently
+    ```
+
+2.  **Install dependencies using Poetry:**
+
+    ```bash
+    poetry install
+    ```
+
+3.  **Set up environment variables:**
+
+    Create a `.env` file in the root directory by copying the example file:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Update the `.env` file with your database credentials, SendGrid API key, and other settings.
+
+### Running the Application
+
+#### With Docker (Recommended)
+
+This is the easiest way to get the application and its services (PostgreSQL, Redis) up and running.
+
+1.  **Build and start the containers:**
+
+    ```bash
+    docker-compose up -d --build
+    ```
+
+2.  **Run database migrations:**
+
+    ```bash
+    docker-compose exec app alembic upgrade head
+    ```
+
+The API will be available at `http://localhost:8000`.
+
+#### Locally (Without Docker)
+
+1.  **Activate the virtual environment:**
+
+    ```bash
+    poetry shell
+    ```
+
+2.  **Run database migrations:**
+
+    ```bash
+    alembic upgrade head
+    ```
+
+3.  **Start the FastAPI server:**
+
+    ```bash
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    ```
+
+4.  **Start the Celery worker:**
+
+    ```bash
+    celery -A app.celery_app.celery worker -Q default,email,notifications -l info
+    ```
+
+## 🧪 Testing
+
+The test suite uses `pytest` and an in-memory SQLite database by default for speed and reliability.
+
+To run the tests:
+
+```bash
+poetry run pytest -q
 ```
 
-Note: In CI and tests the project uses safe defaults and an in-memory SQLite DB to make test runs fast and reliable.
+## 🤝 Contributing
 
-## Environment variables
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
 
-The project reads configuration from environment variables (and a `.env` file). The following variables are used by `app/core/config.py`.
+## 📄 License
 
-- SERVER_NAME (default: `quorix`)
-- SERVER_HOST (default: `http://localhost`)
-- PROJECT_NAME (default: `Evently`)
-- SQLALCHEMY_DATABASE_URI (default: `sqlite+pysqlite:///:memory:`)
-- REDIS_URL (default: `redis://localhost:6379/0`)
-- CELERY_BROKER_URL (default: `memory://`)
-- CELERY_RESULT_BACKEND (default: `rpc://`)
-- SENDGRID_API_KEY
-- SENDGRID_FROM_EMAIL
-- FIRST_SUPERUSER (default: `admin@example.com`)
-- FIRST_SUPERUSER_PASSWORD (default: `changeme`)
-
-Set any of these in a `.env` file at the repo root or in your CI secrets for production.
-
-## Running locally
-
-Start Redis (optional) and run the API:
-
-```powershell
-# Start uvicorn
-.\.venv\Scripts\Activate.ps1; uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Run Celery worker (optional):
-
-```powershell
-.\.venv\Scripts\Activate.ps1; celery -A app.celery_app.celery worker -Q default,email,notifications -l info
-```
-
-## Running tests
-
-Tests use pytest. Run:
-
-```powershell
-.\.venv\Scripts\Activate.ps1; pytest -q
-```
-
-The test suite runs quickly using an in-memory SQLite DB by default.
-
-## Contribution guide
-
-- Fork the repo
-- Create a feature branch: `git checkout -b feat/your-feature`
-- Run tests and linters locally
-- Open a pull request with a clear description and link to any relevant issue
-
-Please follow the existing code style and add tests for new behavior. Use small, focused commits.
-
-## Project structure (high level)
-
-- `app/` - application code (models, schemas, API endpoints)
-- `alembic/` - database migrations
-- `tests/` - test suite
-
-## Troubleshooting
-
-- If pydantic raises missing field errors during import, ensure environment variables are set or rely on defaults during development/CI. For production, provide explicit values in your environment or a `.env` file.
-
-## License
-
-MIT
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
