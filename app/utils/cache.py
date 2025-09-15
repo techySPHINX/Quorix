@@ -1,8 +1,10 @@
-from typing import Any, Callable, Coroutine, Optional
-import json
+from typing import Any, Callable, Coroutine, Optional, TypeVar
+
 import redis.asyncio as redis
 
 _redis_client: Optional[redis.Redis] = None
+
+T = TypeVar("T")
 
 
 async def init_redis(url: str) -> None:
@@ -34,12 +36,12 @@ def get_redis() -> redis.Redis:
 
 
 async def cache_get(
-        key: str,
-        ttl: int,
-        db_loader: Callable[[], Coroutine[Any, Any, Any]],
-        serializer: Callable[[Any], str],
-        deserializer: Callable[[str], Any] = lambda s: json.loads(s),
-) -> Any:
+    key: str,
+    ttl: int,
+    db_loader: Callable[[], Coroutine[Any, Any, T | None]],
+    serializer: Callable[[T], str],
+    deserializer: Callable[[str], T],
+) -> T | None:
     """
     Caching-aside helper:
     - Try to read `key` from Redis.
@@ -77,7 +79,5 @@ async def invalidate_cache(key: str) -> None:
     """
     Delete key from cache (explicit invalidation).
     """
-    r = get_redis()
-    await r.delete(key)
     r = get_redis()
     await r.delete(key)

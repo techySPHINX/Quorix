@@ -1,12 +1,12 @@
-from typing import Optional, List, Dict, Any
 import hashlib
 import json
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import event as event_crud
 from app.schemas.event import Event, EventCreate
-from app.utils.cache import cache_get, invalidate_cache, get_redis
+from app.utils.cache import cache_get, get_redis, invalidate_cache
 
 CACHE_TTL_SECONDS = 60 * 5
 EVENTS_LIST_VERSION_KEY = "events_list_version"
@@ -16,11 +16,10 @@ async def _invalidate_events_list_cache() -> None:
     """Increments the version key for event lists, invalidating all list caches."""
     r = get_redis()
     await r.incr(EVENTS_LIST_VERSION_KEY)
+    return None
 
 
-async def get_event_by_id_cached(
-    db: AsyncSession, event_id: int
-) -> Optional[Event]:
+async def get_event_by_id_cached(db: AsyncSession, event_id: int) -> Optional[Event]:
     """
     Reads an event from the cache if available, otherwise from the database.
     """
@@ -29,15 +28,26 @@ async def get_event_by_id_cached(
     async def db_loader() -> Optional[Event]:
         event_obj = await event_crud.get_event(db, event_id=event_id)
         if event_obj:
-            return Event.model_validate(event_obj)
+            return cast(Event, Event.model_validate(event_obj))
         return None
+
+    def event_serializer(event: Optional[Event]) -> str:
+        if event is None:
+            return "null"
+        return cast(str, event.model_dump_json())
+
+    def event_deserializer(s: str) -> Event:
+        return cast(Event, Event.model_validate_json(s))
+
+    serializer_arg: Callable[[Optional[Event]], str] = event_serializer
+    deserializer_arg: Callable[[str], Event] = event_deserializer
 
     return await cache_get(
         key=key,
         ttl=CACHE_TTL_SECONDS,
         db_loader=db_loader,
-        serializer=lambda pyd: pyd.model_dump_json(),
-        deserializer=lambda s: Event.model_validate_json(s),
+        serializer=serializer_arg,
+        deserializer=deserializer_arg,
     )
 
 
@@ -50,11 +60,11 @@ async def get_events_list_cached(
     """
     r = get_redis()
     version = await r.get(EVENTS_LIST_VERSION_KEY) or 0
-    
+
     # Create a stable hash of the filters dictionary for the cache key
     filters_json = json.dumps(filters, sort_keys=True)
     filters_hash = hashlib.sha256(filters_json.encode()).hexdigest()
-    
+
     key = f"events_list:v{version}:{filters_hash}"
 
     async def db_loader() -> List[Event]:
@@ -69,13 +79,14 @@ async def get_events_list_cached(
     def list_deserializer(data: str) -> List[Event]:
         return [Event(**item) for item in json.loads(data)]
 
-    return await cache_get(
+    events = await cache_get(
         key=key,
         ttl=CACHE_TTL_SECONDS,
         db_loader=db_loader,
         serializer=list_serializer,
         deserializer=list_deserializer,
     )
+    return events if events is not None else []
 
 
 async def create_event(
@@ -88,7 +99,7 @@ async def create_event(
         db, event=event_data, organizer_id=organizer_id
     )
     await _invalidate_events_list_cache()
-    return Event.model_validate(event_obj)
+    return cast(Event, Event.model_validate(event_obj))
 
 
 async def update_event_and_invalidate(
@@ -103,7 +114,7 @@ async def update_event_and_invalidate(
     if updated_event:
         await invalidate_cache(f"event:{event_id}")
         await _invalidate_events_list_cache()
-        return Event.model_validate(updated_event)
+        return cast(Event, Event.model_validate(updated_event))
     return None
 
 

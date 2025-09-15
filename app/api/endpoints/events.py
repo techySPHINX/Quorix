@@ -1,4 +1,4 @@
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,7 @@ async def create_event(
     event = await event_service.create_event(
         db=db, event_data=event_in, organizer_id=current_user.id
     )
-    return cast(EventSchema, event)
+    return event
 
 
 @router.get("/", response_model=List[EventSchema], summary="List Events with Filters")  # type: ignore[misc]
@@ -119,7 +119,7 @@ async def read_events(
         "available_only": available_only,
     }
     events = await event_service.get_events_list_cached(db=db, filters=filters)
-    return cast(list[EventSchema], events)
+    return events
 
 
 @router.get("/{event_id}", response_model=EventSchema, summary="Get Event Details")  # type: ignore[misc]
@@ -159,7 +159,7 @@ async def read_event(
     event = await event_service.get_event_by_id_cached(db=db, event_id=event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    return cast(EventSchema, event)
+    return event
 
 
 @router.put("/{event_id}", response_model=EventSchema, summary="Update Event")  # type: ignore[misc]
@@ -214,7 +214,7 @@ async def update_event(
     )
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    return cast(EventSchema, event)
+    return event
 
 
 @router.delete("/{event_id}", response_model=EventSchema, summary="Delete Event")  # type: ignore[misc]
