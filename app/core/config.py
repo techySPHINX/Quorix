@@ -13,8 +13,11 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
     # Server
-    SERVER_NAME: str
-    SERVER_HOST: AnyHttpUrl
+    # Server
+    # Provide safe defaults for CI/test environments. These can be overridden
+    # via environment variables or a .env file in production deployments.
+    SERVER_NAME: str = "quorix"
+    SERVER_HOST: AnyHttpUrl = "http://localhost"
 
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
@@ -33,12 +36,13 @@ class Settings(BaseSettings):
         raise ValueError(f"Invalid CORS origins: {v}")
 
     # Project
-    PROJECT_NAME: str
+    PROJECT_NAME: str = "Quorix"
     SENTRY_DSN: Optional[HttpUrl] = None
 
     # Database & Redis
-    SQLALCHEMY_DATABASE_URI: str
-    REDIS_URL: str
+    # Use in-memory SQLite for tests by default and local redis fallback URL.
+    SQLALCHEMY_DATABASE_URI: str = "sqlite+pysqlite:///:memory:"
+    REDIS_URL: str = "redis://localhost:6379/0"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 30
     DB_POOL_TIMEOUT: int = 30
@@ -46,8 +50,10 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
 
     # Celery
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
+    # Default to a simple in-memory backend alternative for tests. CI or
+    # production should set real broker/backends via env vars.
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     CELERY_TASK_SERIALIZER: str = "json"
     CELERY_RESULT_SERIALIZER: str = "json"
     CELERY_ACCEPT_CONTENT: List[str] = ["json"]
@@ -88,8 +94,8 @@ class Settings(BaseSettings):
         )
 
     EMAIL_TEST_USER: EmailStr = "test@example.com"
-    FIRST_SUPERUSER: EmailStr
-    FIRST_SUPERUSER_PASSWORD: str
+    FIRST_SUPERUSER: EmailStr = "admin@example.com"
+    FIRST_SUPERUSER_PASSWORD: str = "changeme"
     USERS_OPEN_REGISTRATION: bool = False
 
     # Notifications
