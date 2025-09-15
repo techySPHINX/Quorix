@@ -30,43 +30,43 @@ Our core models are `User`, `Event`, and `Booking`.
 The relationship between these models is visualized in the Entity-Relationship (ER) diagram below.
 
 ```mermaid
-flowchart TD
-    subgraph USER_TABLE["USER Table"]
-        U1["🔑 id (PK)"]
-        U2["username"]
-        U3["email"]
-        U4["hashed_password"]
-        U5["is_active"]
-        U6["is_superuser"]
-    end
+erDiagram
+    USER ||--o{ EVENT : organizes
+    USER ||--o{ BOOKING : makes
+    EVENT ||--o{ BOOKING : has
 
-    subgraph EVENT_TABLE["EVENT Table"]
-        E1["🔑 id (PK)"]
-        E2["name"]
-        E3["description"]
-        E4["start_date"]
-        E5["end_date"]
-        E6["location"]
-        E7["price"]
-        E8["capacity"]
-        E9["available_tickets"]
-        E10["🔗 organizer_id (FK)"]
-        E11["is_active"]
-    end
+    USER {
+        int id
+        string username
+        string email
+        string hashed_password
+        bool is_active
+        bool is_superuser
+    }
 
-    subgraph BOOKING_TABLE["BOOKING Table"]
-        B1["🔑 id (PK)"]
-        B2["🔗 user_id (FK)"]
-        B3["🔗 event_id (FK)"]
-        B4["booked_at"]
-        B5["number_of_tickets"]
-        B6["total_price"]
-        B7["status"]
-    end
+    EVENT {
+        int id
+        string name
+        string description
+        datetime start_date
+        datetime end_date
+        string location
+        float price
+        int capacity
+        int available_tickets
+        int organizer_id
+        bool is_active
+    }
 
-    USER_TABLE -->|organizes| EVENT_TABLE
-    USER_TABLE -->|makes| BOOKING_TABLE
-    EVENT_TABLE -->|has| BOOKING_TABLE
+    BOOKING {
+        int id
+        int user_id
+        int event_id
+        datetime booked_at
+        int number_of_tickets
+        numeric total_price
+        string status
+    }
 ```
 
 ### 2.2. Integrity and Performance
@@ -149,9 +149,9 @@ graph TD
         end
         subgraph "Data & Messaging"
             D[PostgreSQL Database]
-            E[Redis (Cache & Locks)]
+            E["Redis Cache & Locks"]
             F[Celery Workers]
-            G[Message Broker (e.g., RabbitMQ)]
+            G["Message Broker (RabbitMQ)"]
         end
     end
 
