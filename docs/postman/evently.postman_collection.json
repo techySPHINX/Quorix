@@ -168,6 +168,43 @@
               "_body": { "message": "Logout successful" }
             }
           ]
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"StrongP@ssw0rd\",\n  \"full_name\": \"New User\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/auth/register" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+                  "pm.test('Has id and email', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); pm.expect(json).to.have.property('email'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Example",
+              "status": "Created",
+              "code": 201,
+              "_body": {
+                "id": 999,
+                "email": "newuser@example.com",
+                "full_name": "New User"
+              }
+            }
+          ]
         }
       ]
     },

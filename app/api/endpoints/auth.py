@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import Token
 from app.schemas.user import User as UserSchema
+from app.schemas.user import UserCreate
 
 router = APIRouter()
 
@@ -232,3 +233,34 @@ async def logout(
     await redis_client.delete(f"access_token:{current_user.id}")
     await redis_client.delete(f"refresh_token:{current_user.id}")
     return {"message": "Logout successful"}
+
+
+@router.post("/register", response_model=UserSchema, summary="Register User")  # type: ignore[misc]
+async def register_user(
+    user_in: UserCreate,
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """
+    Register a new user.
+
+    Creates a new user in the system. Password will be hashed before storage.
+
+    **Request Body:**
+    - `email` (string): User email
+    - `password` (string): Plain-text password
+    - `full_name` (string, optional)
+    - `role` (string, optional)
+
+    **Response:**
+    Returns the created user (without password fields).
+
+    **Errors:**
+    - `400`: Email already registered
+    - `422`: Validation errors
+    """
+    existing = await crud.user.get_by_email(db, email=user_in.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = await crud.user.create(db, obj_in=user_in)
+    return user
