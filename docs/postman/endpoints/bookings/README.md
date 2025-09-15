@@ -1,12 +1,12 @@
-Bookings Endpoint
+# Bookings Endpoint
 
-Base URL: {{base_url}}{{api_prefix}}/bookings
+Base URL:`{{base_url}}{{api_prefix}}/bookings`
 
 Authentication: Bearer Token required for all bookings endpoints
 
 Environment variables to set in Postman:
 
-- base_url: http://localhost:8000
+- base_url:`http://localhost:8000`
 - api_prefix: /api/v1
 - access_token: <your_jwt_token>
 
@@ -16,7 +16,7 @@ Common Headers:
 - Authorization: Bearer {{access_token}}
 
 1. Create booking (POST)
-   URL: {{base_url}}{{api_prefix}}/bookings/
+   URL:`{{base_url}}{{api_prefix}}/bookings/`
    Method: POST
    Body (application/json):
    {
@@ -35,18 +35,18 @@ Errors:
 - 400 with suggestion to join waitlist if not enough tickets
 
 2. List bookings (GET)
-   URL: {{base_url}}{{api_prefix}}/bookings/
+   URL:`{{base_url}}{{api_prefix}}/bookings/`
    Method: GET
    Query params: skip, limit
    Returns: 200 OK - list of bookings (admin sees all, users see own)
 
 3. Get booking by ID (GET)
-   URL: {{base_url}}{{api_prefix}}/bookings/:booking_id
+   URL:`{{base_url}}{{api_prefix}}/bookings/:booking_id`
    Method: GET
    Returns: 200 OK - booking object
 
 4. Cancel booking (PUT)
-   URL: {{base_url}}{{api_prefix}}/bookings/:booking_id/cancel
+   URL:`{{base_url}}{{api_prefix}}/bookings/:booking_id/cancel`
    Method: PUT
    Headers: Authorization: Bearer {{access_token}}
    Returns: 200 OK - cancelled booking

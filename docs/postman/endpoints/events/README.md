@@ -1,14 +1,14 @@
-Events Endpoint
+# Events Endpoint
 
-Base URL: {{base_url}}{{api_prefix}}/events
+Base URL:`{{base_url}}{{api_prefix}}/events`
 
 Authentication: Bearer Token required for all endpoints except public listing (GET /)
 
 Environment variables to set in Postman:
 
-- base_url: http://localhost:8000
-- api_prefix: /api/v1
-- access_token: <your_jwt_token>
+- base_url:`http://localhost:8000`
+- api_prefix:`/api/v1`
+- access_token:`<your_jwt_token>`
 
 Common Headers:
 
@@ -16,7 +16,7 @@ Common Headers:
 - Authorization: Bearer {{access_token}}
 
 1. List events (GET)
-   URL: {{base_url}}{{api_prefix}}/events/
+   URL:`{{base_url}}{{api_prefix}}/events/`
    Method: GET
    Query parameters (optional): skip, limit, location, min_price, max_price, available_only
    Example:
@@ -25,7 +25,7 @@ Common Headers:
 Response: 200 OK - JSON array of events
 
 2. Get event details (GET)
-   URL: {{base_url}}{{api_prefix}}/events/:event_id
+   URL:`{{base_url}}{{api_prefix}}/events/:event_id`
    Method: GET
    Path param: event_id (integer)
 
@@ -35,7 +35,7 @@ Example:
 Response: 200 OK - Event object
 
 3. Create event (POST) - Admin only
-   URL: {{base_url}}{{api_prefix}}/events/
+   URL:`{{base_url}}{{api_prefix}}/events/`
    Method: POST
    Headers: Authorization: Bearer {{access_token}}
    Body (application/json):
@@ -52,7 +52,7 @@ Response: 200 OK - Event object
 Response: 200 OK - created event
 
 4. Update event (PUT) - Admin only
-   URL: {{base_url}}{{api_prefix}}/events/:event_id
+   URL:`{{base_url}}{{api_prefix}}/events/:event_id`
    Method: PUT
    Headers: Authorization: Bearer {{access_token}}
    Body: same as create
@@ -60,7 +60,7 @@ Response: 200 OK - created event
 Response: 200 OK - updated event
 
 5. Delete event (DELETE) - Admin only
-   URL: {{base_url}}{{api_prefix}}/events/:event_id
+   URL:`{{base_url}}{{api_prefix}}/events/:event_id`
    Method: DELETE
    Headers: Authorization: Bearer {{access_token}}
 

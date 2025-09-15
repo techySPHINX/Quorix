@@ -177,14 +177,14 @@ sequenceDiagram
 
     %% A trigger/event notifies the worker
     DB-->>Worker: Notify: booking cancelled for event_id
-    
+
     Worker->>DB: SELECT next user FROM waitlist
     DB-->>Worker: user_id
-    
+
     %% Split the actions into two lines
     Worker->>DB: INSERT new booking for user_id
     Worker->>DB: DELETE user_id from waitlist
-    
+
     Worker->>Notifications: Send confirmation (email/SMS)
     Notifications-->>User: Your spot is confirmed!
 ```

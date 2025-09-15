@@ -1,11 +1,11 @@
-Auth Endpoint
+# Auth Endpoint
 
-Base URL: {{base_url}}{{api_prefix}}/auth
+Base URL:`{{base_url}}{{api_prefix}}/auth`
 
 Environment variables to set in Postman:
 
-- base_url: http://localhost:8000
-- api_prefix: /api/v1
+- base_url:`http://localhost:8000`
+- api_prefix:`/api/v1`
 
 Common Headers:
 
@@ -13,7 +13,7 @@ Common Headers:
 - For JSON refresh: Content-Type: application/json
 
 1. Login (POST)
-   URL: {{base_url}}{{api_prefix}}/auth/login/access-token
+   URL:`{{base_url}}{{api_prefix}}/auth/login/access-token`
    Method: POST
    Body (x-www-form-urlencoded):
 
@@ -27,19 +27,19 @@ curl -X POST "{{base_url}}{{api_prefix}}/auth/login/access-token" \
  -d "username=user@example.com&password=securepassword123"
 
 2. Refresh token (POST)
-   URL: {{base_url}}{{api_prefix}}/auth/login/refresh-token
+   URL:`{{base_url}}{{api_prefix}}/auth/login/refresh-token`
    Method: POST
    Body (application/json): {"refresh_token": "<your_refresh_token>"}
    Response: 200 OK - new access_token
 
 3. Test token (POST)
-   URL: {{base_url}}{{api_prefix}}/auth/login/test-token
+   URL:`{{base_url}}{{api_prefix}}/auth/login/test-token`
    Method: POST
    Headers: Authorization: Bearer {{access_token}}
    Response: 200 OK - user object
 
 4. Logout (POST)
-   URL: {{base_url}}{{api_prefix}}/auth/logout
+   URL:`{{base_url}}{{api_prefix}}/auth/logout`
    Method: POST
    Headers: Authorization: Bearer {{access_token}}
    Response: 200 OK - message
