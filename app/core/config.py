@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
     # Server
-    # Server
     # Provide safe defaults for CI/test environments. These can be overridden
     # via environment variables or a .env file in production deployments.
     SERVER_NAME: str = "quorix"
@@ -40,8 +39,9 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[HttpUrl] = None
 
     # Database & Redis
-    # Use in-memory SQLite for tests by default and local redis fallback URL.
-    SQLALCHEMY_DATABASE_URI: str = "sqlite+pysqlite:///:memory:"
+    # Use in-memory async SQLite for tests by default and local redis fallback URL.
+    # When using SQLite with SQLAlchemy's asyncio engine, use the aiosqlite driver.
+    SQLALCHEMY_DATABASE_URI: str = "sqlite+aiosqlite:///:memory:"
     REDIS_URL: str = "redis://localhost:6379/0"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 30
