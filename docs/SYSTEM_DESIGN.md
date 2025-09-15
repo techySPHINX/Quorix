@@ -13,37 +13,43 @@ This document explains the architecture and design considerations for Quorix: Ev
 - Celery for background tasks (email notifications, waitlist promotion, analytics batching).
 
 ````mermaid
+%%{init: {'theme': 'black'}}%%
 flowchart LR
-  # System Design — Quorix
+    %% System Design — Quorix: Event Booking Notification System
 
-  This document explains the architecture and design considerations for Quorix: Event booking notification system. It covers concurrency, database design, scalability, API design, optional enhancements, and includes Mermaid diagrams for key flows.
+    subgraph User Interaction
+        Client
+    end
 
-  ---
+    subgraph Backend Services
+        API[FastAPI]
+        Broker[(Celery Broker/Redis)]
+        Worker[(Celery Worker)]
+    end
 
-  ## High-level architecture
+    subgraph Data Stores
+        DB[(Postgres)]
+        RedisCache[(Redis Cache)]
+    end
 
-  - FastAPI for HTTP API endpoints.
-  - SQLAlchemy (async) + Alembic for persistence and migrations.
-  - Postgres (recommended) as the production relational store.
-  - Redis for caching and as Celery broker/result backend.
-  - Celery for background tasks (email notifications, waitlist promotion, analytics batching).
+    subgraph External Services
+        Notifications[Email/SMS Service]
+    end
 
-  ```mermaid
-  flowchart LR
-    Client -->|HTTP| API[FastAPI]
-    API --> DB[(Postgres)]
-    API --> Redis[(Redis Cache)]
-    API -->|enqueue| Broker[(Celery Broker)]
-    Broker -->|execute| Worker[(Celery Worker)]
-    Worker --> DB
-    Worker -->|publish| Notifications[Email/SMS]
+    Client -->|HTTPS Request| API
+    API -->|Read/Write| DB
+    API -->|Cache Lookups| RedisCache
+    API -->|Enqueue Task| Broker
+    Broker -->|Distribute Task| Worker
+    Worker -->|Update DB| DB
+    Worker -->|Send Notification| Notifications
 ````
 
 ---
 
 ## Concurrency & Race Conditions
 
-Problem: Multiple users may try to book the last remaining seats concurrently. Without proper controls, overselling can occur.
+`Problem: Multiple users may try to book the last remaining seats concurrently. Without proper controls, overselling can occur.`
 
 Techniques to prevent oversell:
 
@@ -60,11 +66,11 @@ Techniques to prevent oversell:
   - Cons: locks reduce concurrency; long transactions can lead to contention.
 
 - Queues / Serializers
-  - Push booking requests to a single- or sharded-queue; workers process requests sequentially per event or per partition key (e.g., event_id). This serializes booking operations and eliminates race conditions.
+  - Push booking requests to a `single- or sharded-queue`; workers process requests sequentially per event or per partition key (e.g., event_id). This serializes booking operations and eliminates race conditions.
   - Pros: deterministic, easy to scale by sharding across events.
   - Cons: increases write latency; requires queue infrastructure.
 
-Recommended approach for Evently (production-ready):
+Recommended approach for Quorix (production-ready):
 
 Indexes:
 
@@ -157,20 +163,30 @@ Error handling patterns
 
 ```mermaid
 sequenceDiagram
-  participant User
-  participant API
-  participant DB
-  participant Worker
+    participant User
+    participant API
+    participant DB
+    participant Worker
+    participant Notifications
 
-  User->>API: POST /events/:id/waitlist
-  API->>DB: INSERT waitlist (event_id, user_id)
-  API-->>User: 201 Created
+    User->>API: POST /events/:id/waitlist
+    API->>DB: INSERT into waitlist (event_id, user_id)
+    API-->>User: 201 Created (You're on the waitlist!)
 
-  Note over DB,Worker: Later, when a booking is cancelled
-  DB->>Worker: trigger or event via enqueue
-  Worker->>DB: SELECT next user FROM waitlist WHERE event_id = :id ORDER BY position LIMIT 1
-  Worker->>DB: INSERT booking for user; DELETE waitlist row
-  Worker->>API: send notification (email/SMS)
+    Note over DB,Worker: Later, a spot opens up...
+
+    %% A trigger/event notifies the worker
+    DB-->>Worker: Notify: booking cancelled for event_id
+    
+    Worker->>DB: SELECT next user FROM waitlist
+    DB-->>Worker: user_id
+    
+    %% Split the actions into two lines
+    Worker->>DB: INSERT new booking for user_id
+    Worker->>DB: DELETE user_id from waitlist
+    
+    Worker->>Notifications: Send confirmation (email/SMS)
+    Notifications-->>User: Your spot is confirmed!
 ```
 
 ---
@@ -210,11 +226,3 @@ sequenceDiagram
 ```
 
 ---
-
-## Final notes
-
-If you'd like, I can also:
-
-- Add a `.env.example` file listing all environment variables.
-- Add a short production checklist to the README describing how to rotate secrets, configure Postgres, Redis, and Celery.
-- Convert diagrams into PNG/SVG and embed them in the repo.
