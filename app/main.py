@@ -1,8 +1,16 @@
+import os
+import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any, Dict, cast
 
 from fastapi import FastAPI
 from sqlalchemy import text
 from starlette.middleware.cors import CORSMiddleware
+
+from app.database import engine
+from app.redis import redis_client
+from app.utils.cache import close_redis, init_redis
 
 from .api.api import api_router
 from .api.openapi_tags import security_schemes, tags_metadata
@@ -10,9 +18,9 @@ from .core.config import settings
 
 # API Metadata
 app = FastAPI(
-    title="Evently - Event Management & Ticketing System",
+    title="Quorix- Event Management & Ticketing System",
     description="""
-    **Evently** is a comprehensive event management and ticketing platform built with FastAPI.
+    **Quorixt** is a comprehensive event management and ticketing platform built with FastAPI.
 
     ## Features
 
@@ -70,6 +78,7 @@ app = FastAPI(
     },
 )
 
+
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -122,12 +131,12 @@ app.openapi = custom_openapi
 @app.get("/", tags=["Root"], summary="API Welcome Message")  # type: ignore[misc]
 async def root() -> dict[str, Any]:
     """
-    Welcome endpoint for the Evently API.
+    Welcome endpoint for the Quorix API.
 
     Returns basic API information and links to documentation.
     """
     return {
-        "message": "Welcome to Evently API",
+        "message": "Welcome to Quorix API",
         "version": "1.0.0",
         "docs": f"{settings.API_V1_STR}/docs",
         "redoc": f"{settings.API_V1_STR}/redoc",
@@ -143,11 +152,6 @@ async def health_check() -> dict[str, Any]:
 
     Returns the current operational status of the API.
     """
-    import time
-
-    from app.database import engine
-    from app.redis import redis_client
-
     start_time = time.time()
 
     # Check database connection
@@ -178,3 +182,16 @@ async def health_check() -> dict[str, Any]:
         "services": {"database": db_status, "redis": redis_status},
         "version": "1.0.0",
     }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan event handler."""
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    await init_redis(redis_url)
+    yield
+    await close_redis()
+
+
+# Attach lifespan handler
+app.router.lifespan_context = lifespan
