@@ -16,7 +16,7 @@ Quorix is an event booking and notification microservice built with FastAPI, SQL
 
 This repository includes a detailed system design document covering concurrency controls, database modeling, scalability patterns, API design, and optional features (waitlists, seat-level booking, notifications, analytics).
 
-See `docs/SYSTEM_DESIGN.md` for the full design, diagrams, and engineering tradeoffs.
+See [System Design](docs/SYSTEM_DESIGN.md) for the full design, diagrams, and engineering tradeoffs.
 
 ## Table of contents
 

@@ -12,16 +12,32 @@ This document explains the architecture and design considerations for Quorix: Ev
 - Redis for caching and as Celery broker/result backend.
 - Celery for background tasks (email notifications, waitlist promotion, analytics batching).
 
-```mermaid
+````mermaid
 flowchart LR
-  Client -->|HTTP| API[FastAPI]
-  API --> DB[(Postgres)]
-  API --> Redis[(Redis Cache)]
-  API -->|enqueue| Broker[(Celery Broker)]
-  Broker -->|execute| Worker[(Celery Worker)]
-  Worker --> DB
-  Worker -->|publish| Notifications[Email/SMS]
-```
+  # System Design — Quorix
+
+  This document explains the architecture and design considerations for Quorix: Event booking notification system. It covers concurrency, database design, scalability, API design, optional enhancements, and includes Mermaid diagrams for key flows.
+
+  ---
+
+  ## High-level architecture
+
+  - FastAPI for HTTP API endpoints.
+  - SQLAlchemy (async) + Alembic for persistence and migrations.
+  - Postgres (recommended) as the production relational store.
+  - Redis for caching and as Celery broker/result backend.
+  - Celery for background tasks (email notifications, waitlist promotion, analytics batching).
+
+  ```mermaid
+  flowchart LR
+    Client -->|HTTP| API[FastAPI]
+    API --> DB[(Postgres)]
+    API --> Redis[(Redis Cache)]
+    API -->|enqueue| Broker[(Celery Broker)]
+    Broker -->|execute| Worker[(Celery Worker)]
+    Worker --> DB
+    Worker -->|publish| Notifications[Email/SMS]
+````
 
 ---
 
@@ -49,57 +65,6 @@ Techniques to prevent oversell:
   - Cons: increases write latency; requires queue infrastructure.
 
 Recommended approach for Evently (production-ready):
-
-- Use optimistic locking as primary strategy for high throughput. Implement limited retries with exponential backoff.
-- For very high contention events (e.g., ticket drops), use a dedicated queue to serialize booking requests for that event ID (hybrid approach).
-
-Mermaid sequence for optimistic locking flow:
-
-```mermaid
-sequenceDiagram
-  participant Client
-  participant API
-  participant DB
-
-  Client->>API: POST /events/:id/book (user_id)
-  API->>DB: SELECT capacity, version FROM events WHERE id = :id
-  DB-->>API: capacity=1, version=42
-  API->>DB: BEGIN
-  API->>DB: INSERT INTO bookings(...) ; UPDATE events SET capacity=capacity-1, version=version+1 WHERE id=:id AND version=42
-  alt update success
-    DB-->>API: commit
-    API-->>Client: 201 Created
-  else update failed
-    DB-->>API: rollback
-    API-->>Client: 409 Conflict (retry suggested)
-  end
-```
-
-Edge cases & retries:
-
-- Limit retries to a small constant (e.g., 3 attempts).
-- If retries exhausted, enqueue for manual handling or return a clear error message.
-
----
-
-## Database Design
-
-Core entities:
-
-- users
-  - id (PK), email (unique), name, hashed_password, created_at
-- events
-  - id (PK), organizer_id (FK -> users), title, capacity (int), start_time, end_time, metadata/jsonb, version (int for optimistic locking), created_at
-- bookings
-  - id (PK), event_id (FK -> events), user_id (FK -> users), status (enum: active,cancelled,waitlisted), seat_info (nullable), created_at
-- waitlist
-  - id (PK), event_id (FK), user_id (FK), position, created_at
-
-Integrity between capacity and bookings:
-
-- Keep `events.capacity` as the total seats available.
-- To compute remaining seats: `available = events.capacity - (SELECT COUNT(*) FROM bookings WHERE event_id = :id AND status = 'active')`.
-- Denormalize `events.remaining` or `events.booked_count` for faster reads, but ensure updates happen in the same transaction or using optimistic locking to avoid stale reads.
 
 Indexes:
 

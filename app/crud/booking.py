@@ -5,9 +5,10 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
 from redis.asyncio import Redis
-from sqlalchemy import and_, case, coalesce, func, select, update
+from sqlalchemy import and_, case, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import coalesce
 
 from app.core.db_utils import db_transaction
 from app.models.booking import Booking, BookingStatus
@@ -21,8 +22,8 @@ logger = logging.getLogger(__name__)
 class BookingConcurrencyManager:
     """Manages booking concurrency using distributed locking and atomic operations"""
 
-    def __init__(self, redis_client: Redis[bytes]):
-        self.redis: Redis[bytes] = redis_client
+    def __init__(self, redis_client: Redis):
+        self.redis: Redis = redis_client
         self.lock_timeout = 30  # seconds
 
     async def acquire_booking_lock(self, event_id: int, user_id: int) -> Optional[str]:
@@ -63,15 +64,15 @@ class BookingConcurrencyManager:
 concurrency_manager: Optional[BookingConcurrencyManager] = None
 
 
-def init_concurrency_manager(redis_client: Redis[bytes]) -> None:
+def init_concurrency_manager(redis_client: Redis) -> None:
     global concurrency_manager
     concurrency_manager = BookingConcurrencyManager(redis_client)
 
 
 async def get_booking(db: AsyncSession, booking_id: int) -> Optional[Booking]:
     result = await db.execute(select(Booking).filter(Booking.id == booking_id))
-    first: Optional[Booking] = result.scalars().first()
-    return first
+    booking = result.scalars().first()
+    return booking if isinstance(booking, Booking) or booking is None else None
 
 
 async def get_bookings_with_pagination(
@@ -98,15 +99,16 @@ async def get_bookings_with_pagination(
     total = total_result.scalar_one()
     query = query.order_by(Booking.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
-    bookings = result.scalars().all()
-    return list(bookings), total
+    # scalars().all() returns a Sequence; convert to list to match the declared return type
+    bookings = list(result.scalars().all())
+    return bookings, total
 
 
 async def create_booking_atomic(
     db: AsyncSession,
     booking_data: BookingCreate,
     user_id: int,
-    redis_client: Optional[Redis[bytes]] = None,
+    redis_client: Optional[Redis] = None,
 ) -> Tuple[Optional[Booking], str]:
     if not concurrency_manager and redis_client:
         init_concurrency_manager(redis_client)
@@ -137,7 +139,7 @@ async def create_booking_atomic(
                 select(Booking).filter(
                     Booking.user_id == user_id,
                     Booking.event_id == event_id,
-                    Booking.status.in_(  # type: ignore[attr-defined]
+                    Booking.status.in_(
                         [BookingStatus.CONFIRMED, BookingStatus.PENDING]
                     ),
                 )
@@ -173,6 +175,7 @@ async def create_booking_atomic(
                     int(event.id), 1, "active"
                 )
 
+            # Send notification
             try:
                 from app.core.notifications import notification_service
                 from app.crud.user import get_user
@@ -241,6 +244,8 @@ async def cancel_booking_atomic(
         if event and event.start_date <= datetime.utcnow() + timedelta(hours=24):
             return None, "Cannot cancel booking within 24 hours of event start"
 
+        # SQLAlchemy instrumented attributes are seen as Column objects by static checkers;
+        # silence the assignment type errors at these instance attribute writes.
         booking.status = BookingStatus.CANCELLED
         booking.updated_at = datetime.utcnow()
 
@@ -258,6 +263,7 @@ async def cancel_booking_atomic(
                 int(booking.event_id), -1, "active"
             )
 
+        # Send cancellation notification
         try:
             from app.core.notifications import notification_service
             from app.crud.user import get_user
@@ -360,7 +366,8 @@ async def process_waitlist_conversion(
             .order_by(Booking.created_at.desc())
             .limit(len(conversions))
         )
-        bookings = booking_query.scalars().all()
+        # Convert to list to satisfy declared return types
+        bookings = list(booking_query.scalars().all())
 
         for i, booking in enumerate(bookings):
             conversions[i]["booking_id"] = int(booking.id)
@@ -457,7 +464,7 @@ async def validate_booking_constraints(
         select(Booking).filter(
             Booking.user_id == user_id,
             Booking.event_id == event_id,
-            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.PENDING]),  # type: ignore[attr-defined]
+            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.PENDING]),
         )
     )
     if existing_booking_result.scalars().first():
@@ -476,4 +483,5 @@ async def get_user_booking_history(
         .offset(skip)
         .limit(limit)
     )
-    return list(result.scalars().all())
+    bookings = result.scalars().all()
+    return list(bookings)

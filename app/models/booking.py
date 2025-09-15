@@ -1,4 +1,5 @@
 import enum
+from typing import Any
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Integer, Numeric
 from sqlalchemy.orm import relationship
@@ -24,9 +25,7 @@ class Booking(Base):
     )
     number_of_tickets = Column(Integer, nullable=False)
     total_price = Column(Numeric(10, 2), nullable=True)  # Store calculated price
-    status: BookingStatus = Column(
-        Enum(BookingStatus), default=BookingStatus.PENDING, index=True
-    )
+    status: Any = Column(Enum(BookingStatus), default=BookingStatus.PENDING, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
