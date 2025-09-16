@@ -1,10 +1,15 @@
+import logging
 import os
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Dict, cast
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimitExceeded
+from pythonjsonlogger import JsonFormatter
 from sqlalchemy import text
 from starlette.middleware.cors import CORSMiddleware
 
@@ -58,9 +63,9 @@ app = FastAPI(
     version="1.0.0",
     terms_of_service="https://example.com/terms/",
     contact={
-        "name": "Evently Support",
+        "name": "Quorix Support",
         "url": "https://example.com/contact/",
-        "email": "support@evently.com",
+        "email": "support@quorix.com",
     },
     license_info={
         "name": "MIT License",
@@ -78,6 +83,26 @@ app = FastAPI(
     },
 )
 
+# Configure structured logging
+log_handler = logging.StreamHandler()
+formatter = JsonFormatter(
+    """
+    {
+        "level": "%(levelname)s",
+        "time": "%(asctime)s",
+        "message": "%(message)s",
+        "loggerName": "%(name)s",
+        "processName": "%(processName)s",
+        "fileName": "%(filename)s",
+        "lineNumber": "%(lineno)d"
+    }
+    """
+)
+log_handler.setFormatter(formatter)
+logging.basicConfig(handlers=[log_handler], level=settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
+logger.info("Application logging configured.")
+
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
@@ -91,6 +116,29 @@ if settings.BACKEND_CORS_ORIGINS:
 
 # Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.exception_handler(HTTPException)  # type: ignore[misc]
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    logger.error(
+        "HTTPException occurred: %s",
+        exc.detail,
+        extra={"status_code": exc.status_code, "headers": exc.headers},
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(Exception)  # type: ignore[misc]
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception occurred: %s", exc)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal Server Error"},
+    )
 
 
 def custom_openapi() -> Dict[str, Any]:
@@ -157,15 +205,15 @@ async def health_check() -> dict[str, Any]:
     # Check database connection
     db_status = "healthy"
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
     except Exception:
         db_status = "unhealthy"
 
     # Check Redis connection
     redis_status = "healthy"
     try:
-        redis_client.ping()
+        await redis_client.ping()
     except Exception:
         redis_status = "unhealthy"
 
@@ -189,8 +237,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan event handler."""
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     await init_redis(redis_url)
+    await FastAPILimiter.init(redis_client)
     yield
     await close_redis()
+
+
+@app.exception_handler(RateLimitExceeded)  # type: ignore[misc]
+async def rate_limit_exception_handler(
+    request: Request, exc: RateLimitExceeded
+) -> JSONResponse:
+    client_host = request.client.host if request.client else "unknown"
+    logger.warning("Rate limit exceeded for client: %s", client_host)
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": "Rate limit exceeded. Please try again later."},
+    )
 
 
 # Attach lifespan handler

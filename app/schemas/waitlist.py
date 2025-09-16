@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..models.waitlist import WaitlistStatus
 from .event import Event
@@ -26,4 +26,4 @@ class Waitlist(WaitlistBase):
     user: User
     event: Event
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

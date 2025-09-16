@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..models.booking import BookingStatus
 from .event import Event
@@ -24,4 +24,4 @@ class Booking(BookingBase):
     user: User
     event: Event
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
