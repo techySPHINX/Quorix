@@ -1,0 +1,12 @@
+{
+  "name": "quorix-api-tests",
+  "version": "1.0.0",
+  "description": "Automated API testing for Quorix using Newman (Postman CLI)",
+  "scripts": {
+    "test:api": "newman run ./docs/postman/evently.postman_collection.json -e ./docs/postman/evently.postman_environment.json -r cli,htmlextra --reporter-htmlextra-export ./newman-report.html"
+  },
+  "devDependencies": {
+    "newman": "^6.1.0",
+    "newman-reporter-htmlextra": "1.23.1"
+  }
+}

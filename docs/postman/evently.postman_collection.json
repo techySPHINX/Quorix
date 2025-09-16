@@ -20,6 +20,43 @@
       "name": "Auth",
       "item": [
         {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"TestUser@123\",\n  \"full_name\": \"Test User\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}{{api_prefix}}/auth/register" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+                  "pm.test('Has id and email', function () { var json = pm.response.json(); pm.expect(json).to.have.property('id'); pm.expect(json).to.have.property('email'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Example",
+              "status": "Created",
+              "code": 201,
+              "_body": {
+                "id": 999,
+                "email": "testuser@example.com",
+                "full_name": "Test User"
+              }
+            }
+          ]
+        },
+        {
           "name": "Login - access token (form)",
           "request": {
             "method": "POST",
@@ -34,19 +71,18 @@
               "urlencoded": [
                 {
                   "key": "username",
-                  "value": "user@example.com",
+                  "value": "testuser@example.com",
                   "type": "text"
                 },
                 {
                   "key": "password",
-                  "value": "securepassword123",
+                  "value": "TestUser@123",
                   "type": "text"
                 }
               ]
             },
             "url": {
-              "raw": "{{base_url}}{{api_prefix}}/auth/login/access-token",
-              "host": ["{{base_url}}{{api_prefix}}/auth/login/access-token"]
+              "raw": "{{base_url}}{{api_prefix}}/auth/login/access-token"
             }
           },
           "event": [

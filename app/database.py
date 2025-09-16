@@ -59,10 +59,13 @@ Base = declarative_base()
 def set_postgres_settings(dbapi_connection: Any, connection_record: _Any) -> None:
     """Set PostgreSQL-specific performance settings on new connections."""
     if "postgresql" in str(engine.url):
-        with dbapi_connection.cursor() as cursor:
+        cursor = dbapi_connection.cursor()
+        try:
             cursor.execute("SET statement_timeout = '60s'")
             cursor.execute("SET lock_timeout = '30s'")
             cursor.execute("SET idle_in_transaction_session_timeout = '10min'")
+        finally:
+            cursor.close()
 
 
 @event.listens_for(engine.sync_engine, "checkout")  # type: ignore[misc]

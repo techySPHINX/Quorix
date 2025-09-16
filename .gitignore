@@ -52,6 +52,9 @@ evently-env/
 *.sublime-project
 *.sublime-workspace
 
+# Newman reports
+newman-report.html
+
 # Environment variables
 .env
 venv/
@@ -60,3 +63,5 @@ env/
 *.swp
 *~
 .DS_Store
+package-lock.json
+node_modules/
