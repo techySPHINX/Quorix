@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EventBase(BaseModel):
@@ -11,7 +11,7 @@ class EventBase(BaseModel):
     end_date: datetime
     location: str
     price: float
-    capacity: int
+    capacity: int = Field(..., gt=0, description="Capacity must be positive.")
 
 
 class EventCreate(EventBase):

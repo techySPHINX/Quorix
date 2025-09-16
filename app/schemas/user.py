@@ -7,7 +7,7 @@ from app.models.user import UserRole
 
 
 class UserBase(BaseModel):
-    email: Optional[EmailStr] = None
+    email: EmailStr
     is_active: bool = True
     is_superuser: bool = False
     full_name: Optional[str] = None
@@ -16,7 +16,6 @@ class UserBase(BaseModel):
 
 # Properties to receive via API on creation
 class UserCreate(UserBase):
-    email: EmailStr
     password: str
     role: Optional[UserRole] = UserRole.USER
 

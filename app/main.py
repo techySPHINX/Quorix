@@ -8,8 +8,8 @@ from typing import Any, Dict, cast
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
-from fastapi_limiter.depends import RateLimitExceeded
-from pythonjsonlogger import JsonFormatter
+from pythonjsonlogger.json import JsonFormatter
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from starlette.middleware.cors import CORSMiddleware
 
