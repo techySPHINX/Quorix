@@ -71,7 +71,7 @@ async def notify_waitlist_users(
     for waitlist_entry in waiting_users:
         if available_tickets >= waitlist_entry.number_of_tickets:
             waitlist_entry.status = WaitlistStatus.NOTIFIED
-            waitlist_entry.notified_at = datetime.utcnow()
+            setattr(waitlist_entry, "notified_at", datetime.utcnow())
             notified_users.append(waitlist_entry)
             available_tickets -= waitlist_entry.number_of_tickets
         else:

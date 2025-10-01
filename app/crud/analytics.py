@@ -718,9 +718,10 @@ async def get_event_performance(db: AsyncSession, event_id: int) -> dict[str, An
 
     waitlist = waitlist_stats.first()
 
+    event_capacity = getattr(event, "capacity", 0)
     utilization_rate = (
-        (stats.tickets_sold / event.capacity) * 100
-        if event.capacity > 0 and stats
+        (stats.tickets_sold / event_capacity) * 100
+        if event_capacity > 0 and stats
         else 0
     )
     conversion_rate = (
@@ -733,7 +734,7 @@ async def get_event_performance(db: AsyncSession, event_id: int) -> dict[str, An
             "name": event.name,
             "location": event.location,
             "capacity": event.capacity,
-            "price": float(event.price),
+            "price": float(getattr(event, "price", 0)),
             "start_date": event.start_date,
         },
         "performance": {

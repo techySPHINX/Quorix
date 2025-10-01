@@ -4,9 +4,17 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import crud
 from app.api.deps import get_current_admin_user, get_current_user, get_db
 from app.core.notifications import notification_service
+from app.crud.notification import create_bulk
+from app.crud.notification import delete_notification as delete_notification_crud
+from app.crud.notification import get_notification as get_notification_crud
+from app.crud.notification import (
+    get_user_notifications,
+    get_user_stats,
+    mark_all_read,
+    mark_read,
+)
 from app.models.notification import NotificationPriority, NotificationType
 from app.models.user import User
 from app.schemas.notification import Notification
@@ -24,7 +32,7 @@ async def get_notifications(
     notification_types: Optional[List[NotificationType]] = Query(None),
     priority: Optional[NotificationPriority] = Query(None),
 ) -> List[Notification]:
-    return await crud.notification.get_user_notifications(
+    notifications = await get_user_notifications(
         db=db,
         user_id=current_user.id,
         skip=skip,
@@ -33,6 +41,8 @@ async def get_notifications(
         notification_types=notification_types,
         priority=priority,
     )
+    # Convert model objects to schema objects if needed
+    return [Notification.model_validate(n) for n in notifications]
 
 
 @router.get("/{notification_id}", response_model=Notification)  # type: ignore[misc]
@@ -41,18 +51,25 @@ async def get_notification(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Notification:
-    notification = await crud.notification.get_notification(
+    notification_obj = await get_notification_crud(
         db=db, notification_id=notification_id
     )
-    if not notification:
+    from app import crud
+
+    if not notification_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
         )
-    if notification.user_id != current_user.id and not crud.user.is_admin(current_user):
+    if notification_obj.user_id != current_user.id and not crud.user.is_admin(
+        current_user
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    return notification
+    validated = Notification.model_validate(notification_obj)
+    if not isinstance(validated, Notification):
+        raise TypeError("Validated object is not of type Notification")
+    return validated
 
 
 @router.put("/{notification_id}/mark-read")  # type: ignore[misc]
@@ -61,23 +78,25 @@ async def mark_notification_read(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
-    notification = await crud.notification.get_notification(
+    notification_obj = await get_notification_crud(
         db=db, notification_id=notification_id
     )
-    if not notification:
+    if not notification_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
         )
-    if notification.user_id != current_user.id:
+    if notification_obj.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    updated_notification = await crud.notification.mark_read(
-        db=db, notification_id=notification_id
-    )
+    updated_notification = await mark_read(db=db, notification_id=notification_id)
     return {
         "message": "Notification marked as read",
-        "notification": updated_notification,
+        "notification": (
+            Notification.model_validate(updated_notification)
+            if updated_notification
+            else None
+        ),
     }
 
 
@@ -86,7 +105,7 @@ async def mark_all_notifications_read(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
-    marked_count = await crud.notification.mark_all_read(db=db, user_id=current_user.id)
+    marked_count = await mark_all_read(db=db, user_id=current_user.id)
     return {"message": f"Marked {marked_count} notifications as read"}
 
 
@@ -96,18 +115,23 @@ async def delete_notification(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
-    notification = await crud.notification.get_notification(
+    notification_obj = await get_notification_crud(
         db=db, notification_id=notification_id
     )
-    if not notification:
+    if not notification_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
         )
-    if notification.user_id != current_user.id:
+    if notification_obj.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    await crud.notification.delete_notification(db=db, notification_id=notification_id)
+    deleted = await delete_notification_crud(db=db, notification_id=notification_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to delete notification",
+        )
     return {"message": "Notification deleted successfully"}
 
 
@@ -116,7 +140,7 @@ async def get_notification_stats(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
-    return await crud.notification.get_user_stats(db=db, user_id=current_user.id)
+    return await get_user_stats(db=db, user_id=current_user.id)
 
 
 @router.post("/admin/send-notification")  # type: ignore[misc]
@@ -207,7 +231,7 @@ async def create_bulk_notifications(
     data: Optional[dict] = None,
     priority: NotificationPriority = NotificationPriority.NORMAL,
 ) -> dict[str, Any]:
-    notifications = await crud.notification.create_bulk(
+    notifications = await create_bulk(
         db=db,
         user_ids=user_ids,
         notification_type=notification_type,

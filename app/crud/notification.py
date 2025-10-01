@@ -103,11 +103,11 @@ async def mark_read(db: AsyncSession, notification_id: int) -> Optional[Notifica
 
     if notification:
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        setattr(notification, "read_at", datetime.utcnow())
         await db.commit()
         await db.refresh(notification)
-
-    return notification
+        return notification
+    return None
 
 
 async def mark_all_read(db: AsyncSession, user_id: int) -> int:
@@ -121,13 +121,12 @@ async def mark_all_read(db: AsyncSession, user_id: int) -> int:
 
     count = 0
     for notification in notifications:
-        notification.is_read = True
-        notification.read_at = datetime.utcnow()
-        count += 1
-
+        if notification:
+            notification.is_read = True
+            setattr(notification, "read_at", datetime.utcnow())
+            count += 1
     if count > 0:
         await db.commit()
-
     return count
 
 

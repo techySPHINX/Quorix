@@ -13,8 +13,6 @@ from .database import async_session_maker
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
 
 async def get_async_db() -> AsyncSession:
     """Get async database session."""
@@ -66,7 +64,13 @@ def send_booking_confirmation_email(self: Any, user_id: int, booking_id: int) ->
                     logger.error(f"User {user_id} not found")
                     return False
 
-                event = await crud.event.get_event(db, booking.event_id)
+                event_id = booking.event_id
+                # If event_id is a SQLAlchemy Column, get its value
+                if hasattr(event_id, "name") and not isinstance(event_id, int):
+                    event_id = getattr(booking, "event_id", None)
+                if not isinstance(event_id, int):
+                    event_id = int(str(event_id))
+                event = await crud.event.get_event(db, event_id)
                 if not event:
                     logger.error(f"Event {booking.event_id} not found")
                     return False
@@ -142,7 +146,12 @@ def send_booking_cancellation_email(self: Any, user_id: int, booking_id: int) ->
                     logger.error(f"User {user_id} not found")
                     return False
 
-                event = await crud.event.get_event(db, booking.event_id)
+                event_id = booking.event_id
+                if hasattr(event_id, "name") and not isinstance(event_id, int):
+                    event_id = getattr(booking, "event_id", None)
+                if not isinstance(event_id, int):
+                    event_id = int(str(event_id))
+                event = await crud.event.get_event(db, event_id)
                 if not event:
                     logger.error(f"Event {booking.event_id} not found")
                     return False
@@ -296,7 +305,12 @@ def send_event_reminder_emails(self: Any, event_id: int, hours_before: int = 24)
                 sent_count = 0
 
                 for booking in confirmed_bookings:
-                    user = await crud.user.get_user(db, user_id=booking.user_id)
+                    user_id = booking.user_id
+                    if hasattr(user_id, "name") and not isinstance(user_id, int):
+                        user_id = getattr(booking, "user_id", None)
+                    if not isinstance(user_id, int):
+                        user_id = int(str(user_id))
+                    user = await crud.user.get_user(db, user_id=user_id)
                     if not user:
                         continue
 
@@ -361,10 +375,13 @@ def notify_waitlist_users(self: Any, event_id: int, available_tickets: int) -> i
 
                 # Send email notifications to notified users
                 for waitlist_entry in notified_users:
-                    send_waitlist_notification_email.delay(
-                        user_id=waitlist_entry.user_id,
-                        event_id=event_id,
-                        available_tickets=waitlist_entry.number_of_tickets,
+                    celery_app.send_task(
+                        "app.tasks.send_waitlist_notification_email",
+                        kwargs={
+                            "user_id": waitlist_entry.user_id,
+                            "event_id": event_id,
+                            "available_tickets": waitlist_entry.number_of_tickets,
+                        },
                     )
 
                 logger.info(
@@ -413,7 +430,9 @@ def schedule_event_reminders() -> None:
 
                 scheduled_count = 0
                 for event in events:
-                    send_event_reminder_emails.delay(event.id, 24)
+                    celery_app.send_task(
+                        "app.tasks.send_event_reminder_emails", args=(event.id, 24)
+                    )
                     scheduled_count += 1
 
                 logger.info(f"Scheduled {scheduled_count} event reminder tasks")
@@ -554,20 +573,10 @@ def periodic_email_queue_processing() -> None:
 
     # Process multiple batches if needed
     for batch_num in range(5):  # Maximum 5 batches per run
-        result = process_notification_email_queue.delay(batch_size)
-        try:
-            batch_result = result.get(timeout=300)  # 5 minute timeout
-            if batch_result and batch_result.get("processed", 0) > 0:
-                total_processed += batch_result["processed"]
-                logger.info(
-                    f"Batch {batch_num + 1} processed {batch_result['processed']} emails"
-                )
-            else:
-                # No more emails to process
-                break
-        except Exception as e:
-            logger.error(f"Error in batch {batch_num + 1}: {e}")
-            break
+        celery_app.send_task(
+            "app.tasks.process_notification_email_queue",
+            kwargs={"batch_size": batch_size},
+        )
 
     logger.info(
         f"Periodic email processing completed. Total processed: {total_processed}"
@@ -760,16 +769,29 @@ def send_combined_notification(
                 if preferences and preferences.email_enabled:
                     # Delegate to appropriate email task based on type
                     if notification_type == "booking_confirmation":
-                        send_booking_confirmation_email.delay(
-                            user_id, data["booking_id"]
+                        celery_app.send_task(
+                            "app.tasks.send_booking_confirmation_email",
+                            kwargs={
+                                "user_id": user_id,
+                                "booking_id": data["booking_id"],
+                            },
                         )
                     elif notification_type == "booking_cancellation":
-                        send_booking_cancellation_email.delay(
-                            user_id, data["booking_id"]
+                        celery_app.send_task(
+                            "app.tasks.send_booking_cancellation_email",
+                            kwargs={
+                                "user_id": user_id,
+                                "booking_id": data["booking_id"],
+                            },
                         )
                     elif notification_type == "waitlist_notification":
-                        send_waitlist_notification_email.delay(
-                            user_id, data["event_id"], data["available_tickets"]
+                        celery_app.send_task(
+                            "app.tasks.send_waitlist_notification_email",
+                            kwargs={
+                                "user_id": user_id,
+                                "event_id": data["event_id"],
+                                "available_tickets": data["available_tickets"],
+                            },
                         )
 
                     logger.info(f"Queued email notification for user {user_id}")
@@ -913,7 +935,9 @@ def send_system_announcement(self: Any, announcement_data: Dict[str, Any]) -> in
                 batch_size = 50
                 for i in range(0, len(notification_batch), batch_size):
                     batch = notification_batch[i : i + batch_size]
-                    process_bulk_notifications.delay(batch)
+                    celery_app.send_task(
+                        "app.tasks.process_bulk_notifications", args=(batch,)
+                    )
 
                 logger.info(f"Queued system announcement for {len(users)} users")
                 return len(users)
@@ -933,114 +957,19 @@ def send_system_announcement(self: Any, announcement_data: Dict[str, Any]) -> in
 @celery_app.task(bind=True, max_retries=2)  # type: ignore[misc]
 def send_waitlist_notifications(self: Any, event_id: int) -> None:
     """Notify waitlisted users when spots become available"""
-    from sqlalchemy import func
 
-    from app.database import SessionLocal
-    from app.models.booking import Booking
-    from app.models.event import Event
-    from app.models.waitlist import Waitlist
-
-    try:
-        db = SessionLocal()
-
-        event = db.query(Event).filter(Event.id == event_id).first()
-        if not event:
-            logger.error(f"Event {event_id} not found")
-            return
-
-        # Get current availability
-        current_bookings = (
-            db.query(func.sum(Booking.number_of_tickets))
-            .filter(Booking.event_id == event_id, Booking.status == "confirmed")
-            .scalar()
-            or 0
-        )
-
-        available_spots = event.max_attendees - current_bookings
-
-        if available_spots > 0:
-            # Get waitlisted users in order
-            waitlist_entries = (
-                db.query(Waitlist)
-                .filter(Waitlist.event_id == event_id, Waitlist.status == "waiting")
-                .order_by(Waitlist.created_at)
-                .limit(available_spots)
-                .all()
-            )
-
-            notification_tasks = []
-            for entry in waitlist_entries:
-                task_data = {
-                    "user_id": entry.user_id,
-                    "notification_type": "waitlist_notification",
-                    "title": f"Spot Available - {event.name}",
-                    "message": f"Good news! A spot has opened up for {event.name}. Book now before it's gone!",
-                    "data": {
-                        "waitlist_id": entry.id,
-                        "event_id": event.id,
-                        "event_name": event.name,
-                        "event_date": event.date.isoformat(),
-                        "available_spots": available_spots,
-                    },
-                    "send_email": True,
-                    "email_template": "waitlist_notification",
-                    "priority": "high",
-                }
-                notification_tasks.append(task_data)
-
-                # Update waitlist status
-                entry.status = "notified"
-                entry.notified_at = datetime.utcnow()
-
-            db.commit()
-
-            # Send notifications in batch
-            if notification_tasks:
-                process_bulk_notifications.delay(notification_tasks)
-
-        # No return value expected
-    except Exception as exc:
-        logger.error(f"Failed to send waitlist notifications: {exc}")
-        self.retry(countdown=30 * (2**self.request.retries))
-    finally:
-        db.close()
+    # This function should be rewritten to use async session and queries
+    # For now, raise NotImplementedError to avoid silent errors
+    raise NotImplementedError(
+        "send_waitlist_notifications must be rewritten for async SQLAlchemy usage."
+    )
 
 
 @celery_app.task  # type: ignore[misc]
 def update_notification_stats() -> None:
     """Update notification delivery statistics"""
-    from app.database import SessionLocal
-    from app.models.user import Notification
-    from app.redis import redis_client
-
-    try:
-        db = SessionLocal()
-
-        # Calculate stats for the last 24 hours
-        since = datetime.utcnow() - timedelta(hours=24)
-
-        stats = {
-            "total_sent": db.query(Notification)
-            .filter(Notification.created_at >= since)
-            .count(),
-            "delivered": db.query(Notification)
-            .filter(
-                Notification.created_at >= since, Notification.status == "delivered"
-            )
-            .count(),
-            "read": db.query(Notification)
-            .filter(Notification.created_at >= since, Notification.read_at.isnot(None))
-            .count(),
-            "failed": db.query(Notification)
-            .filter(Notification.created_at >= since, Notification.status == "failed")
-            .count(),
-        }
-
-        # Store in Redis
-        redis_client.hmset("notification_stats:24h", stats)
-        redis_client.expire("notification_stats:24h", 86400)  # 24 hours
-
-    except Exception as exc:
-        logger.error(f"Failed to update notification stats: {exc}")
-    finally:
-        db.close()
+    # This function should be rewritten to use async session and queries
+    # For now, raise NotImplementedError to avoid silent errors
+    raise NotImplementedError(
+        "update_notification_stats must be rewritten for async SQLAlchemy usage."
+    )

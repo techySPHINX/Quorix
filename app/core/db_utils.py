@@ -154,15 +154,15 @@ async def bulk_insert_or_update(
         if invalid_updates:
             raise ValueError(f"Invalid update columns: {invalid_updates}")
 
-        stmt = pg_insert(table).values(batch)
+        stmt = pg_insert(model).values(batch)
         if local_update_columns:
             stmt = stmt.on_conflict_do_update(
                 index_elements=[table.c[c] for c in conflict_columns],
                 set_={c: getattr(stmt.excluded, c) for c in local_update_columns},
             )
 
-        result: Result[Any] = await db.execute(stmt)
-        affected_rows += getattr(result, "rowcount", 0) or 0
+            result: Result[Any] = await db.execute(stmt)
+            affected_rows += getattr(result, "rowcount", 0) or 0
 
     await db.commit()
     return affected_rows
@@ -232,14 +232,9 @@ class DatabaseHealthCheck:
 
     @staticmethod
     async def get_connection_pool_status(engine: AsyncEngine) -> Dict[str, Any]:
-        pool = engine.pool
-        return {
-            "pool_size": pool.size(),
-            "checked_in": pool.checkedin(),
-            "checked_out": pool.checkedout(),
-            "overflow": pool.overflow(),
-            "total_connections": pool.size() + pool.overflow(),
-        }
+        # AsyncEngine does not support pool stats methods like size(), checkedin(), etc.
+        # Return a message indicating stats are not available for async engines.
+        return {"pool_stats": "Not available for AsyncEngine."}
 
     @staticmethod
     async def get_slow_queries(

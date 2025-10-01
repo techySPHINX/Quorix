@@ -26,8 +26,6 @@ async def create_notification(
     """Create a notification."""
     # Accept either enum or raw string for notification_type
     # Check for NotificationType first because Enum members subclass str and
-    # isinstance(x, str) would be True for enum members which makes the
-    # alternate branch unreachable.
     if isinstance(notification_type, NotificationType):
         nt = notification_type
     else:

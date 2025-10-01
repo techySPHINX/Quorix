@@ -24,7 +24,7 @@ async def read_users(
     if not current_user.is_superuser:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     users = await crud.user.get_users(db, skip=skip, limit=limit)
-    return users
+    return [UserSchema.model_validate(u) for u in users]
 
 
 @router.get("/{user_id}", response_model=UserSchema)  # type: ignore[misc]

@@ -130,9 +130,9 @@ async def create_booking_atomic(
             event = event_result.scalars().first()
             if not event:
                 return None, "Event not found or not active"
-            if event.available_tickets < requested_tickets:
+            if getattr(event, "available_tickets", 0) < requested_tickets:
                 return None, f"Only {event.available_tickets} tickets available"
-            if event.start_date <= datetime.utcnow():
+            if getattr(event, "start_date", datetime.min) <= datetime.utcnow():
                 return None, "Cannot book tickets for past or ongoing events"
 
             existing_booking_result = await db.execute(
@@ -147,7 +147,7 @@ async def create_booking_atomic(
             if existing_booking_result.scalars().first():
                 return None, "User already has an active booking for this event"
 
-            total_price = Decimal(str(event.price)) * requested_tickets
+            total_price = Decimal(str(getattr(event, "price", 0))) * requested_tickets
             booking = Booking(
                 user_id=user_id,
                 event_id=event_id,
@@ -162,7 +162,8 @@ async def create_booking_atomic(
                 update(Event)
                 .where(Event.id == event_id)
                 .values(
-                    available_tickets=Event.available_tickets - requested_tickets,
+                    available_tickets=getattr(event, "available_tickets", 0)
+                    - requested_tickets,
                     updated_at=datetime.utcnow(),
                 )
             )
@@ -172,7 +173,7 @@ async def create_booking_atomic(
 
             if concurrency_manager:
                 await concurrency_manager.update_event_booking_stats(
-                    int(event.id), 1, "active"
+                    int(getattr(event, "id", event_id)), 1, "active"
                 )
 
             # Send notification
@@ -232,67 +233,84 @@ async def cancel_booking_atomic(
         booking = booking_result.scalars().first()
         if not booking:
             return None, "Booking not found"
-        if user_id and booking.user_id != user_id:
-            return None, "Not authorized to cancel this booking"
-        if booking.status != BookingStatus.CONFIRMED:
-            return None, f"Cannot cancel booking with status: {booking.status.value}"
+    if user_id and getattr(booking, "user_id", None) != user_id:
+        return None, "Not authorized to cancel this booking"
+    status = getattr(booking, "status", None)
+    if status != BookingStatus.CONFIRMED:
+        status_str = status.value if status and hasattr(status, "value") else "Unknown"
+        return None, f"Cannot cancel booking with status: {status_str}"
 
-        event_result = await db.execute(
-            select(Event).filter(Event.id == booking.event_id)
+    event_result = await db.execute(
+        select(Event).filter(Event.id == getattr(booking, "event_id", None))
+    )
+    event = event_result.scalars().first()
+    if event and getattr(
+        event, "start_date", datetime.min
+    ) <= datetime.utcnow() + timedelta(hours=24):
+        return None, "Cannot cancel booking within 24 hours of event start"
+
+    # SQLAlchemy instrumented attributes are seen as Column objects by static checkers;
+    # silence the assignment type errors at these instance attribute writes.
+    booking.status = BookingStatus.CANCELLED
+    setattr(booking, "updated_at", datetime.utcnow())
+
+    await db.execute(
+        update(Event)
+        .where(Event.id == getattr(booking, "event_id", None))
+        .values(
+            available_tickets=getattr(event, "available_tickets", 0)
+            + getattr(booking, "number_of_tickets", 0),
+            updated_at=datetime.utcnow(),
         )
-        event = event_result.scalars().first()
-        if event and event.start_date <= datetime.utcnow() + timedelta(hours=24):
-            return None, "Cannot cancel booking within 24 hours of event start"
+    )
 
-        # SQLAlchemy instrumented attributes are seen as Column objects by static checkers;
-        # silence the assignment type errors at these instance attribute writes.
-        booking.status = BookingStatus.CANCELLED
-        booking.updated_at = datetime.utcnow()
-
-        await db.execute(
-            update(Event)
-            .where(Event.id == booking.event_id)
-            .values(
-                available_tickets=Event.available_tickets + booking.number_of_tickets,
-                updated_at=datetime.utcnow(),
-            )
+    if concurrency_manager:
+        await concurrency_manager.update_event_booking_stats(
+            int(getattr(booking, "event_id", 0)), -1, "active"
         )
 
-        if concurrency_manager:
-            await concurrency_manager.update_event_booking_stats(
-                int(booking.event_id), -1, "active"
-            )
+    # Send cancellation notification
+    try:
+        from app.core.notifications import notification_service
+        from app.crud.user import get_user
+        from app.models.notification import NotificationPriority, NotificationType
 
-        # Send cancellation notification
-        try:
-            from app.core.notifications import notification_service
-            from app.crud.user import get_user
-            from app.models.notification import NotificationPriority, NotificationType
-
-            user = await get_user(db, user_id=int(booking.user_id))
-            payload = {
-                "booking_id": booking.id,
-                "event_id": booking.event_id,
-                "event_name": event.name if event else "TBA",
-                "event_date": str(event.start_date) if event else "TBA",
-                "event_location": event.location if event else "TBA",
-                "number_of_tickets": booking.number_of_tickets,
-                "cancelled_at": datetime.utcnow().isoformat(),
-            }
+        user_id_val = getattr(booking, "user_id", None)
+        user = (
+            await get_user(db, user_id=user_id_val) if user_id_val is not None else None
+        )
+        payload = {
+            "booking_id": getattr(booking, "id", None),
+            "event_id": getattr(booking, "event_id", None),
+            "event_name": getattr(event, "name", "TBA") if event else "TBA",
+            "event_date": str(getattr(event, "start_date", "TBA")) if event else "TBA",
+            "event_location": getattr(event, "location", "TBA") if event else "TBA",
+            "number_of_tickets": getattr(booking, "number_of_tickets", 0),
+            "cancelled_at": datetime.utcnow().isoformat(),
+        }
+        user_id_for_notification = None
+        if user and hasattr(user, "id"):
+            user_id_for_notification = user.id
+        elif hasattr(booking, "user_id"):
+            user_id_for_notification = booking.user_id
+        if user_id_for_notification is not None:
+            # Ensure user_id_for_notification is int, not SQLAlchemy Column
+            if not isinstance(user_id_for_notification, int):
+                user_id_for_notification = int(str(user_id_for_notification))
             await notification_service.send_notification(
                 db=db,
-                user=user or int(booking.user_id),
+                user=user_id_for_notification,
                 notification_type=NotificationType.BOOKING_CANCELLATION,
-                title=f"Booking Cancelled - {event.name if event else 'Event'}",
-                message=f"Your booking for {booking.number_of_tickets} ticket(s) has been cancelled.",
+                title=f"Booking Cancelled - {getattr(event, 'name', 'Event') if event else 'Event'}",
+                message=f"Your booking for {getattr(booking, 'number_of_tickets', 0)} ticket(s) has been cancelled.",
                 data=payload,
                 priority=NotificationPriority.HIGH,
                 send_email=True,
             )
-        except Exception as e:
-            logger.warning(f"Failed to send cancellation notification: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to send cancellation notification: {e}")
 
-        return booking, "Booking cancelled successfully"
+    return booking, "Booking cancelled successfully"
 
 
 async def process_waitlist_conversion(
@@ -336,7 +354,7 @@ async def process_waitlist_conversion(
             db.add(booking)
 
             entry.status = WaitlistStatus.CONVERTED
-            entry.updated_at = datetime.utcnow()
+            setattr(entry, "updated_at", datetime.utcnow())
             remaining_tickets -= entry.number_of_tickets
 
             conversions.append(
@@ -370,7 +388,10 @@ async def process_waitlist_conversion(
         bookings = list(booking_query.scalars().all())
 
         for i, booking in enumerate(bookings):
-            conversions[i]["booking_id"] = int(booking.id)
+            booking_id_val = getattr(booking, "id", None)
+            conversions[i]["booking_id"] = (
+                int(booking_id_val) if booking_id_val is not None else 0
+            )
 
     return conversions
 
@@ -423,27 +444,31 @@ async def get_event_booking_summary(db: AsyncSession, event_id: int) -> Dict[str
         )()
 
     utilization_rate = (
-        ((event.capacity - event.available_tickets) / event.capacity * 100)
-        if event.capacity > 0
+        (
+            (getattr(event, "capacity", 0) - getattr(event, "available_tickets", 0))
+            / getattr(event, "capacity", 1)
+            * 100
+        )
+        if getattr(event, "capacity", 0) > 0
         else 0
     )
 
     return {
-        "event_id": event.id,
-        "event_name": event.name,
-        "capacity": event.capacity,
-        "available_tickets": event.available_tickets,
+        "event_id": getattr(event, "id", event_id),
+        "event_name": getattr(event, "name", ""),
+        "capacity": getattr(event, "capacity", 0),
+        "available_tickets": getattr(event, "available_tickets", 0),
         "utilization_rate": utilization_rate,
         "bookings": {
-            "total": stats_row.total_bookings,
-            "confirmed": stats_row.confirmed_bookings,
-            "cancelled": stats_row.cancelled_bookings,
-            "tickets_sold": stats_row.total_tickets,
-            "revenue": float(stats_row.total_revenue or 0),
+            "total": getattr(stats_row, "total_bookings", 0),
+            "confirmed": getattr(stats_row, "confirmed_bookings", 0),
+            "cancelled": getattr(stats_row, "cancelled_bookings", 0),
+            "tickets_sold": getattr(stats_row, "total_tickets", 0),
+            "revenue": float(getattr(stats_row, "total_revenue", 0) or 0),
         },
         "waitlist": {
-            "size": waitlist_row.waitlist_size,
-            "converted": waitlist_row.waitlist_conversions,
+            "size": getattr(waitlist_row, "waitlist_size", 0),
+            "converted": getattr(waitlist_row, "waitlist_conversions", 0),
         },
     }
 
@@ -453,12 +478,12 @@ async def validate_booking_constraints(
 ) -> Tuple[bool, str]:
     event_result = await db.execute(select(Event).filter(Event.id == event_id))
     event = event_result.scalars().first()
-    if not event or not event.is_active:
+    if not event or not getattr(event, "is_active", False):
         return False, "Event not found or inactive"
-    if event.start_date <= datetime.utcnow():
+    if getattr(event, "start_date", datetime.min) <= datetime.utcnow():
         return False, "Cannot book tickets for past or ongoing events"
-    if tickets_requested > event.available_tickets:
-        return False, f"Only {event.available_tickets} tickets available"
+    if tickets_requested > getattr(event, "available_tickets", 0):
+        return False, f"Only {getattr(event, 'available_tickets', 0)} tickets available"
 
     existing_booking_result = await db.execute(
         select(Booking).filter(

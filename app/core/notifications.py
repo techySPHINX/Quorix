@@ -296,8 +296,8 @@ class NotificationService:
                 }
 
             result = await db.execute(select(User).filter(User.role == role_enum))
-            users = result.scalars().all()
-            if not users:
+            users_list = list(result.scalars().all())
+            if not users_list:
                 return {
                     "total": 0,
                     "in_app_success": 0,
@@ -308,7 +308,7 @@ class NotificationService:
 
             return await self.send_bulk_notifications(
                 db=db,
-                users=users,
+                users=users_list,
                 notification_type=notification_type,
                 title=title,
                 message=message,

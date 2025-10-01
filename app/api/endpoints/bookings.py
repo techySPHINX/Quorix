@@ -44,9 +44,12 @@ async def create_booking(
             },
         )
     # Send confirmation email
-    from app.tasks import send_booking_confirmation_email
+    from app.celery_app import celery_app
 
-    send_booking_confirmation_email.delay(current_user.id, booking.id)
+    celery_app.send_task(
+        "app.tasks.send_booking_confirmation_email",
+        args=[current_user.id, booking.id],
+    )
     return booking
 
 
@@ -60,7 +63,9 @@ async def read_bookings(
     """
     Retrieve bookings. Regular users see only their own bookings.
     """
-    if current_user.is_superuser:
+    is_superuser = getattr(current_user, "is_superuser", False)
+    # If is_superuser is a SQLAlchemy column, compare explicitly
+    if is_superuser:
         bookings, _ = await crud.booking.get_bookings_with_pagination(
             db, skip=skip, limit=limit
         )
@@ -68,7 +73,8 @@ async def read_bookings(
         bookings = await crud.booking.get_user_booking_history(
             db, current_user.id, limit=limit, skip=skip
         )
-    return bookings
+    # Convert model objects to schema objects if needed
+    return [Booking.model_validate(b) for b in bookings]
 
 
 @router.get("/{booking_id}", response_model=Booking)  # type: ignore[misc]
@@ -84,7 +90,12 @@ async def read_booking(
     booking = await crud.booking.get_booking(db=db, booking_id=booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if not current_user.is_superuser and booking.user_id != current_user.id:
+    is_superuser = getattr(current_user, "is_superuser", False)
+    superuser_check = bool(is_superuser)
+    user_id_check = getattr(booking, "user_id", None) == getattr(
+        current_user, "id", None
+    )
+    if not superuser_check and not user_id_check:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     return booking
 
@@ -102,9 +113,13 @@ async def cancel_booking(
     booking = await crud.booking.get_booking(db=db, booking_id=booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if not current_user.is_superuser and booking.user_id != current_user.id:
+    is_superuser = getattr(current_user, "is_superuser", False)
+    superuser_check = bool(is_superuser)
+    user_id_check = getattr(booking, "user_id", None) == getattr(
+        current_user, "id", None
+    )
+    if not superuser_check and not user_id_check:
         raise HTTPException(status_code=400, detail="Not enough permissions")
-    # Use cancel_booking_atomic and handle tuple return
     booking, message = await crud.booking.cancel_booking_atomic(
         db=db, booking_id=booking_id, user_id=current_user.id
     )
@@ -113,7 +128,10 @@ async def cancel_booking(
             status_code=400, detail=message or "Unable to cancel booking"
         )
     # Send cancellation email
-    from app.tasks import send_booking_cancellation_email
+    from app.celery_app import celery_app
 
-    send_booking_cancellation_email.delay(current_user.id, booking.id)
+    celery_app.send_task(
+        "app.tasks.send_booking_cancellation_email",
+        args=[current_user.id, booking.id],
+    )
     return booking

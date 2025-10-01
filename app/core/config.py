@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Provide safe defaults for CI/test environments. These can be overridden
     # via environment variables or a .env file in production deployments.
     SERVER_NAME: str = "quorix"
-    SERVER_HOST: AnyHttpUrl = "http://localhost"
+    SERVER_HOST: str = "http://localhost:8000"
 
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
