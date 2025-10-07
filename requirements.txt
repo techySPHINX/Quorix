@@ -19,8 +19,26 @@ fastapi-limiter==0.1.6
 sendgrid==6.11.0
 jinja2==3.1.4
 
-# Legacy SMTP dependencies (deprecated)
-# aiosmtplib==3.0.1
+# Enhanced features dependencies
+prometheus-client==0.20.0
+structlog==24.1.0
+asyncpg==0.29.0
+
+# Advanced monitoring and observability
+opentelemetry-api==1.24.0
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-prometheus==1.12.0rc1
+opentelemetry-instrumentation-fastapi==0.45b0
+opentelemetry-instrumentation-sqlalchemy==0.45b0
+opentelemetry-instrumentation-redis==0.45b0
+
+# Security enhancements
+cryptography==42.0.7
+pyotp==2.9.0
+
+# Performance and scalability
+slowapi==0.1.9
+limits==3.10.1
 
 # Development and code quality tools
 pre-commit
@@ -30,6 +48,9 @@ isort
 mypy
 bandit
 pytest
+pytest-asyncio==0.23.7
+pytest-cov==5.0.0
+httpx==0.27.0
 
 types-redis
 types-requests

@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import AnyHttpUrl, EmailStr, HttpUrl, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
 
+# Import the new advanced settings
+from app.core.settings import get_settings as get_advanced_settings
+
 
 class Settings(BaseSettings):
     # API & Security
@@ -124,3 +127,6 @@ class Settings(BaseSettings):
 
 
 settings: Settings = Settings()
+
+# Also provide access to advanced settings
+advanced_settings = get_advanced_settings()
