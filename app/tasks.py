@@ -16,8 +16,17 @@ logger = logging.getLogger(__name__)
 
 async def get_async_db() -> AsyncSession:
     """Get async database session."""
+    if async_session_maker is None:
+        raise RuntimeError("Database session factory not initialized")
     async with async_session_maker() as session:
         return session
+
+
+def get_session_maker() -> Any:
+    """Get session maker with runtime check."""
+    if async_session_maker is None:
+        raise RuntimeError("Database session factory not initialized")
+    return async_session_maker
 
 
 T = TypeVar("T")
@@ -52,7 +61,7 @@ def send_booking_confirmation_email(self: Any, user_id: int, booking_id: int) ->
 
     async def _send_email() -> bool:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Get booking with user and event details
                 booking = await crud.booking.get_booking(db, booking_id)
                 if not booking:
@@ -135,7 +144,7 @@ def send_booking_cancellation_email(self: Any, user_id: int, booking_id: int) ->
 
     async def _send_email() -> bool:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 booking = await crud.booking.get_booking(db, booking_id)
                 if not booking:
                     logger.error(f"Booking {booking_id} not found")
@@ -216,7 +225,7 @@ def send_waitlist_notification_email(
 
     async def _send_email() -> bool:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 user = await crud.user.get_user(db, user_id=user_id)
                 if not user:
                     logger.error(f"User {user_id} not found")
@@ -283,7 +292,7 @@ def send_event_reminder_emails(self: Any, event_id: int, hours_before: int = 24)
 
     async def _send_reminders() -> int:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 event = await crud.event.get_event(db, event_id)
                 if not event:
                     logger.error(f"Event {event_id} not found")
@@ -367,7 +376,7 @@ def notify_waitlist_users(self: Any, event_id: int, available_tickets: int) -> i
 
     async def _notify_users() -> int:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Get waitlist users and notify them
                 notified_users = await crud.waitlist.notify_waitlist_users(
                     db, event_id, available_tickets
@@ -410,7 +419,7 @@ def schedule_event_reminders() -> None:
 
     async def _schedule_reminders() -> None:
         try:
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Find events that need reminders (24 hours before start)
                 tomorrow = datetime.utcnow() + timedelta(hours=24)
                 start_time = tomorrow.replace(minute=0, second=0, microsecond=0)
@@ -471,9 +480,8 @@ def process_notification_email_queue(self: Any, batch_size: int = 50) -> Dict[st
     async def _process_queue() -> Dict[str, Any]:
         try:
             from .core.notifications import notification_service
-            from .database import async_session_maker
 
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 result: Dict[str, Any] = await notification_service.process_email_queue(
                     db=db, batch_size=batch_size
                 )
@@ -523,10 +531,9 @@ def send_bulk_notifications(
         try:
             from .core.notifications import notification_service
             from .crud.user import get_users_by_ids
-            from .database import async_session_maker
             from .models.notification import NotificationPriority, NotificationType
 
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Convert string enums back to enum objects
                 notification_type_enum = NotificationType(notification_type)
                 priority_enum = NotificationPriority(priority)
@@ -592,9 +599,7 @@ def cleanup_old_notifications() -> None:
         try:
             from app.crud import notification_crud as notification_crud
 
-            from .database import async_session_maker
-
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Keep notifications for 90 days
                 deleted_count = await notification_crud.cleanup_old_notifications(
                     db=db, days_to_keep=90
@@ -629,10 +634,9 @@ def process_in_app_notification(self: Any, notification_data: dict) -> None:
         try:
             from app.crud import notification_crud as notification_crud
 
-            from .database import async_session_maker
             from .models.notification import NotificationPriority, NotificationType
 
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Create in-app notification
                 notification = await notification_crud.create_notification(
                     db=db,
@@ -680,9 +684,7 @@ def process_bulk_notifications(self: Any, notification_batch: list) -> None:
         try:
             from app.crud import notification_crud as notification_crud
 
-            from .database import async_session_maker
-
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 created_notifications = []
 
                 for notification_data in notification_batch:
@@ -741,9 +743,7 @@ def send_combined_notification(
         try:
             from app.crud import notification_crud as notification_crud
 
-            from .database import async_session_maker
-
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Get user preferences
                 user = await crud.user.get_user(db, user_id=user_id)
                 if not user:
@@ -823,9 +823,8 @@ def process_notification_digest() -> None:
             from app.crud import notification_crud as notification_crud
 
             from .crud.user import get_users
-            from .database import async_session_maker
 
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 # Get users who have unread notifications and digest enabled
                 users = await get_users(db)
                 digest_count = 0
@@ -898,10 +897,9 @@ def send_system_announcement(self: Any, announcement_data: Dict[str, Any]) -> in
 
     async def _send_announcement() -> int:
         try:
-            from .database import async_session_maker
             from .models.user import UserRole
 
-            async with async_session_maker() as db:
+            async with get_session_maker()() as db:
                 target_role = announcement_data.get("target_role")
 
                 # Get target users

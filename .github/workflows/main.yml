@@ -1,26 +1,53 @@
-name: CI/CD
+name: Evently CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
   pull_request:
-    branches:
-      - main
-      - develop
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: evently
+  EKS_CLUSTER_NAME: evently-production-eks
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: evently_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -28,10 +55,288 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-test.txt
 
-      - name: Run pre-commit checks
+      - name: Run type checking
         run: |
-          pre-commit run --all-files
+          mypy app/
+
+      - name: Run linting
+        run: |
+          flake8 app/ --max-line-length=88 --extend-ignore=E203,W503
+          black --check app/
+          isort --check-only app/
 
       - name: Run tests
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: |
-          pytest
+          pytest tests/ -v --cov=app --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: |
+          pip install safety bandit
+
+      - name: Check for vulnerabilities
+        run: |
+          safety check
+          bandit -r app/ -f json -o bandit-report.json || true
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: bandit-report.json
+
+  build:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infrastructure/docker/Dockerfile.production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Deploy infrastructure
+        working-directory: infrastructure/terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_domain_name: ${{ secrets.DOMAIN_NAME }}
+          TF_VAR_ssl_certificate_arn: ${{ secrets.SSL_CERTIFICATE_ARN }}
+        run: |
+          terraform init
+          terraform workspace select staging || terraform workspace new staging
+          terraform plan -var-file="terraform.development.tfvars"
+          terraform apply -var-file="terraform.development.tfvars" -auto-approve
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name evently-staging-eks
+
+      - name: Deploy to Kubernetes
+        working-directory: infrastructure/kubernetes
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+        run: |
+          # Update image tags
+          sed -i "s|IMAGE_TAG|${{ needs.build.outputs.image-tag }}|g" *.yaml
+
+          # Create namespace if it doesn't exist
+          kubectl create namespace evently --dry-run=client -o yaml | kubectl apply -f -
+
+          # Create secrets
+          kubectl create secret generic evently-secrets \
+            --from-literal=SECRET_KEY="$SECRET_KEY" \
+            --from-literal=JWT_SECRET_KEY="$JWT_SECRET_KEY" \
+            --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+            --from-literal=SENDGRID_API_KEY="$SENDGRID_API_KEY" \
+            --from-literal=SENDGRID_FROM_EMAIL="$SENDGRID_FROM_EMAIL" \
+            --namespace=evently \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Apply manifests
+          kubectl apply -f evently-api.yaml
+          kubectl apply -f evently-workers.yaml
+          kubectl apply -f evently-ingress.yaml
+
+          # Wait for rollout
+          kubectl rollout status deployment/evently-api -n evently
+          kubectl rollout status deployment/evently-worker -n evently
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Deploy infrastructure
+        working-directory: infrastructure/terraform
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_domain_name: ${{ secrets.DOMAIN_NAME }}
+          TF_VAR_ssl_certificate_arn: ${{ secrets.SSL_CERTIFICATE_ARN }}
+        run: |
+          terraform init
+          terraform workspace select production || terraform workspace new production
+          terraform plan -var-file="terraform.production.tfvars"
+          terraform apply -var-file="terraform.production.tfvars" -auto-approve
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Deploy to Kubernetes
+        working-directory: infrastructure/kubernetes
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+        run: |
+          # Update image tags
+          sed -i "s|IMAGE_TAG|${{ needs.build.outputs.image-tag }}|g" *.yaml
+
+          # Create namespace if it doesn't exist
+          kubectl create namespace evently --dry-run=client -o yaml | kubectl apply -f -
+
+          # Create secrets
+          kubectl create secret generic evently-secrets \
+            --from-literal=SECRET_KEY="$SECRET_KEY" \
+            --from-literal=JWT_SECRET_KEY="$JWT_SECRET_KEY" \
+            --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+            --from-literal=SENDGRID_API_KEY="$SENDGRID_API_KEY" \
+            --from-literal=SENDGRID_FROM_EMAIL="$SENDGRID_FROM_EMAIL" \
+            --namespace=evently \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Apply manifests
+          kubectl apply -f evently-api.yaml
+          kubectl apply -f evently-workers.yaml
+          kubectl apply -f evently-ingress.yaml
+
+          # Wait for rollout
+          kubectl rollout status deployment/evently-api -n evently
+          kubectl rollout status deployment/evently-worker -n evently
+
+      - name: Run health checks
+        run: |
+          # Wait for load balancer
+          sleep 60
+
+          # Get ingress URL
+          INGRESS_URL=$(kubectl get ingress evently-ingress -n evently -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+          # Health check
+          curl -f https://$INGRESS_URL/health || exit 1
+
+          echo "✅ Production deployment successful!"
+          echo "🌐 Application URL: https://$INGRESS_URL"
+
+  notify:
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            🚀 Evently deployment completed!
+            📊 Status: ${{ job.status }}
+            🔗 Commit: ${{ github.sha }}
+            👤 Author: ${{ github.actor }}
+            🌐 Environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

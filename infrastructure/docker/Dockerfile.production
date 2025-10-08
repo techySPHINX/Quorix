@@ -1,0 +1,92 @@
+# Multi-stage Dockerfile for Production Deployment
+FROM python:3.11.8-slim as base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    libpq-dev \
+    && apt-get purge -y --auto-remove build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set work directory
+WORKDIR /app
+
+# Install Python dependencies
+FROM base as dependencies
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Development stage
+FROM dependencies as development
+
+COPY requirements-test.txt .
+RUN pip install --no-cache-dir -r requirements-test.txt
+
+# Copy application code
+COPY . .
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Default command for development
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# Production stage
+FROM dependencies as production
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/cache && \
+    chown -R appuser:appuser /app
+
+# Remove development files
+RUN rm -rf tests/ docs/ *.md requirements-test.txt
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Production command
+CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--preload", "--max-requests", "1000", "--max-requests-jitter", "100", "--timeout", "30", "--keep-alive", "5"]
+
+# Celery worker stage
+FROM production as worker
+
+# Override entrypoint for worker
+CMD ["celery", "-A", "app.celery_app", "worker", "--loglevel=info", "--concurrency=4", "--max-tasks-per-child=1000"]
+
+# Celery beat stage
+FROM production as beat
+
+# Override entrypoint for beat scheduler
+CMD ["celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
+
+# Flower monitoring stage
+FROM production as flower
+
+# Expose flower port
+EXPOSE 5555
+
+# Override entrypoint for flower
+CMD ["celery", "-A", "app.celery_app", "flower", "--port=5555"]

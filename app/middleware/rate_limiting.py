@@ -2,14 +2,14 @@
 Advanced Rate Limiting Middleware
 Provides sophisticated rate limiting with multiple strategies and storage backends.
 """
-import time
-import hashlib
+
 import logging
-from typing import Dict, Optional, Tuple, Any
+import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, Optional, Tuple
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -22,6 +22,7 @@ settings = get_settings()
 
 class RateLimitStrategy(Enum):
     """Rate limiting strategies"""
+
     FIXED_WINDOW = "fixed_window"
     SLIDING_WINDOW = "sliding_window"
     TOKEN_BUCKET = "token_bucket"  # Not a password, just a constant name for strategy type  # nosec
@@ -30,8 +31,9 @@ class RateLimitStrategy(Enum):
 @dataclass
 class RateLimitConfig:
     """Rate limit configuration"""
+
     requests: int  # Number of requests allowed
-    window: int    # Time window in seconds
+    window: int  # Time window in seconds
     strategy: RateLimitStrategy = RateLimitStrategy.FIXED_WINDOW
     burst: Optional[int] = None  # Burst capacity for token bucket
 
@@ -74,7 +76,7 @@ class RateLimiter:
                 "limit": self.config.requests,
                 "remaining": 0,
                 "reset": window_start + self.config.window,
-                "retry_after": window_start + self.config.window - current_time
+                "retry_after": window_start + self.config.window - current_time,
             }
 
         # Increment request count
@@ -84,10 +86,12 @@ class RateLimiter:
             "limit": self.config.requests,
             "remaining": max(0, self.config.requests - current_requests - 1),
             "reset": window_start + self.config.window,
-            "retry_after": 0
+            "retry_after": 0,
         }
 
-    async def _sliding_window_check(self, identifier: str) -> Tuple[bool, Dict[str, Any]]:
+    async def _sliding_window_check(
+        self, identifier: str
+    ) -> Tuple[bool, Dict[str, Any]]:
         """Sliding window rate limiting using sorted sets"""
         current_time = time.time()
         window_start = current_time - self.config.window
@@ -101,7 +105,9 @@ class RateLimiter:
         requests_data = await cache.get(rate_limit_key, [])
 
         # Filter requests within the current window
-        valid_requests = [req_time for req_time in requests_data if req_time > window_start]
+        valid_requests = [
+            req_time for req_time in requests_data if req_time > window_start
+        ]
 
         if len(valid_requests) >= self.config.requests:
             oldest_request = min(valid_requests)
@@ -111,7 +117,7 @@ class RateLimiter:
                 "limit": self.config.requests,
                 "remaining": 0,
                 "reset": int(oldest_request + self.config.window),
-                "retry_after": max(0, retry_after)
+                "retry_after": max(0, retry_after),
             }
 
         # Add current request
@@ -124,7 +130,7 @@ class RateLimiter:
             "limit": self.config.requests,
             "remaining": max(0, self.config.requests - len(valid_requests)),
             "reset": int(current_time + self.config.window),
-            "retry_after": 0
+            "retry_after": 0,
         }
 
     async def _token_bucket_check(self, identifier: str) -> Tuple[bool, Dict[str, Any]]:
@@ -133,10 +139,10 @@ class RateLimiter:
         rate_limit_key = f"rate_limit:bucket:{identifier}"
 
         # Get bucket state
-        bucket_data = await cache.get(rate_limit_key, {
-            "tokens": self.config.requests,
-            "last_refill": current_time
-        })
+        bucket_data = await cache.get(
+            rate_limit_key,
+            {"tokens": self.config.requests, "last_refill": current_time},
+        )
 
         # Calculate tokens to add based on elapsed time
         elapsed = current_time - bucket_data["last_refill"]
@@ -144,21 +150,22 @@ class RateLimiter:
 
         # Refill bucket
         bucket_data["tokens"] = min(
-            self.config.requests,
-            bucket_data["tokens"] + tokens_to_add
+            self.config.requests, bucket_data["tokens"] + tokens_to_add
         )
         bucket_data["last_refill"] = current_time
 
         if bucket_data["tokens"] < 1:
             # Calculate retry after
             tokens_needed = 1 - bucket_data["tokens"]
-            retry_after = int(tokens_needed * (self.config.window / self.config.requests))
+            retry_after = int(
+                tokens_needed * (self.config.window / self.config.requests)
+            )
 
             return False, {
                 "limit": self.config.requests,
                 "remaining": 0,
                 "reset": int(current_time + retry_after),
-                "retry_after": retry_after
+                "retry_after": retry_after,
             }
 
         # Consume one token
@@ -171,35 +178,35 @@ class RateLimiter:
             "limit": self.config.requests,
             "remaining": int(bucket_data["tokens"]),
             "reset": int(current_time + self.config.window),
-            "retry_after": 0
+            "retry_after": 0,
         }
 
 
 class IPWhitelist:
     """IP address whitelist management"""
 
-    def __init__(self):
-        self.whitelist = set()
+    def __init__(self) -> None:
+        self.whitelist: set[str] = set()
         self._load_whitelist()
 
-    def _load_whitelist(self):
+    def _load_whitelist(self) -> None:
         """Load IP whitelist from configuration"""
         # This could be loaded from database, config file, etc.
-        whitelist_ips = getattr(settings, 'RATE_LIMIT_WHITELIST', [])
+        whitelist_ips = getattr(settings, "RATE_LIMIT_WHITELIST", [])
         self.whitelist.update(whitelist_ips)
 
         # Add localhost and common development IPs
-        self.whitelist.update(['127.0.0.1', '::1', 'localhost'])
+        self.whitelist.update(["127.0.0.1", "::1", "localhost"])
 
     def is_whitelisted(self, ip: str) -> bool:
         """Check if IP is whitelisted"""
         return ip in self.whitelist
 
-    def add_ip(self, ip: str):
+    def add_ip(self, ip: str) -> None:
         """Add IP to whitelist"""
         self.whitelist.add(ip)
 
-    def remove_ip(self, ip: str):
+    def remove_ip(self, ip: str) -> None:
         """Remove IP from whitelist"""
         self.whitelist.discard(ip)
 
@@ -216,17 +223,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: Any,
         default_config: Optional[RateLimitConfig] = None,
-        endpoint_configs: Optional[Dict[str, RateLimitConfig]] = None
-    ):
+        endpoint_configs: Optional[Dict[str, RateLimitConfig]] = None,
+    ) -> None:
         super().__init__(app)
 
         # Default configuration
         self.default_config = default_config or RateLimitConfig(
             requests=settings.scalability.RATE_LIMIT_REQUESTS,
             window=settings.scalability.RATE_LIMIT_WINDOW,
-            strategy=RateLimitStrategy.FIXED_WINDOW
+            strategy=RateLimitStrategy.FIXED_WINDOW,
         )
 
         # Endpoint-specific configurations
@@ -241,7 +248,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def _get_client_identifier(self, request: Request) -> str:
         """Get client identifier for rate limiting"""
         # Try to get user ID from request state (set by auth middleware)
-        user_id = getattr(request.state, 'user_id', None)
+        user_id = getattr(request.state, "user_id", None)
         if user_id:
             return f"user:{user_id}"
 
@@ -254,15 +261,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             # Get the first IP in the chain
-            return forwarded.split(",")[0].strip()
+            return str(forwarded.split(",")[0].strip())
 
         # Check for real IP header
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            return str(real_ip.strip())
 
         # Fall back to direct connection
-        return request.client.host if request.client else "unknown"
+        return str(request.client.host) if request.client else "unknown"
 
     def _get_rate_limit_config(self, request: Request) -> RateLimitConfig:
         """Get rate limit configuration for the request"""
@@ -289,7 +296,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         return self._rate_limiters[config_key]
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
         """Process request with rate limiting"""
         # Skip rate limiting if disabled
         if not settings.scalability.RATE_LIMIT_ENABLED:
@@ -324,7 +331,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 response = Response(
                     content='{"detail": "Rate limit exceeded. Please try again later."}',
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    media_type="application/json"
+                    media_type="application/json",
                 )
 
                 # Add rate limit headers
@@ -350,7 +357,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "X-RateLimit-Limit": str(rate_info["limit"]),
             "X-RateLimit-Remaining": str(rate_info["remaining"]),
             "X-RateLimit-Reset": str(rate_info["reset"]),
-            "Retry-After": str(rate_info["retry_after"]) if rate_info["retry_after"] > 0 else ""
+            "Retry-After": (
+                str(rate_info["retry_after"]) if rate_info["retry_after"] > 0 else ""
+            ),
         }
 
 
@@ -358,22 +367,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 RATE_LIMIT_CONFIGS = {
     "/api/v1/auth/login": RateLimitConfig(
         requests=5,
-        window=300,  # 5 requests per 5 minutes
-        strategy=RateLimitStrategy.SLIDING_WINDOW
+        window=300,
+        strategy=RateLimitStrategy.SLIDING_WINDOW,
     ),
     "/api/v1/auth/register": RateLimitConfig(
         requests=3,
-        window=300,  # 3 requests per 5 minutes
-        strategy=RateLimitStrategy.SLIDING_WINDOW
+        window=300,
+        strategy=RateLimitStrategy.SLIDING_WINDOW,
     ),
     "/api/v1/events": RateLimitConfig(
         requests=100,
-        window=3600,  # 100 requests per hour
-        strategy=RateLimitStrategy.TOKEN_BUCKET
+        window=3600,
+        strategy=RateLimitStrategy.TOKEN_BUCKET,
     ),
     "/api/v1/users": RateLimitConfig(
         requests=200,
-        window=3600,  # 200 requests per hour
-        strategy=RateLimitStrategy.FIXED_WINDOW
+        window=3600,
+        strategy=RateLimitStrategy.FIXED_WINDOW,
     ),
 }

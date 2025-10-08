@@ -22,6 +22,8 @@ reusable_oauth2 = OAuth2PasswordBearer(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    if SessionLocal is None:
+        raise RuntimeError("Database session factory not initialized")
     async with SessionLocal() as session:
         yield session
 

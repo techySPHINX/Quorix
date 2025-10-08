@@ -1,18 +1,21 @@
 """
 Advanced Configuration & Environment Management for Evently
 """
-import secrets
-from typing import Any, Dict, List, Optional, Union
-from functools import lru_cache
-from pydantic import BaseSettings, validator, AnyHttpUrl, EmailStr, HttpUrl, ValidationInfo, field_validator
-from pydantic_settings import BaseSettings as PydanticBaseSettings
+
 import logging
+import secrets
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import EmailStr, ValidationInfo, field_validator
+from pydantic_settings import BaseSettings as PydanticBaseSettings
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseSettings(PydanticBaseSettings):
     """Database configuration settings"""
+
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_USER: str = "postgres"
@@ -50,6 +53,7 @@ class DatabaseSettings(PydanticBaseSettings):
 
 class RedisSettings(PydanticBaseSettings):
     """Redis configuration settings"""
+
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
@@ -81,6 +85,7 @@ class RedisSettings(PydanticBaseSettings):
 
 class SecuritySettings(PydanticBaseSettings):
     """Security and authentication settings"""
+
     SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_ALGORITHM: str = "HS256"
@@ -208,7 +213,7 @@ class EmailSettings(PydanticBaseSettings):
     EMAIL_BATCH_SIZE: int = 10
     EMAIL_BATCH_DELAY: float = 1.0
 
-    @field_validator("EMAILS_ENABLED", mode="before")
+    @field_validator("EMAILS_ENABLED", mode="before")  # type: ignore
     @classmethod
     def get_emails_enabled(cls, v: bool, info: ValidationInfo) -> bool:
         values: Dict[str, Any] = info.data if info.data else {}
@@ -216,7 +221,7 @@ class EmailSettings(PydanticBaseSettings):
             values.get("SENDGRID_API_KEY") and values.get("SENDGRID_FROM_EMAIL")
         )
 
-    @field_validator("SENDGRID_FROM_NAME", mode="before")
+    @field_validator("SENDGRID_FROM_NAME", mode="before")  # type: ignore
     @classmethod
     def get_sendgrid_from_name(
         cls, v: Optional[str], info: ValidationInfo
@@ -247,6 +252,7 @@ class Settings(PydanticBaseSettings):
     # Server Configuration
     SERVER_NAME: str = "evently"
     import os
+
     SERVER_HOST: str = os.getenv("SERVER_HOST", "127.0.0.1")
     SERVER_PORT: int = 8000
     SERVER_WORKERS: int = 1
@@ -255,11 +261,9 @@ class Settings(PydanticBaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     ALLOWED_HOSTS: List[str] = ["*"]
 
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")  # type: ignore
     @classmethod
-    def assemble_cors_origins(
-        cls, v: Union[str, List[str]]
-    ) -> List[str]:
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):

@@ -2,21 +2,20 @@
 Enhanced Dependencies with Advanced Features
 Provides dependency injection for authentication, authorization, and advanced features.
 """
-from app.models.user import User
-from app.crud.user import get as get_user_by_id
-import logging
-from typing import AsyncGenerator, Optional, Any, Dict
-from functools import wraps
 
-from fastapi import Depends, HTTPException, status, Security, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
+from functools import wraps
+from typing import Any, Callable, Dict, Optional
+
+from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database_manager import get_db
 from app.core.cache import cache
-from app.core.security import get_password_hash, verify_password
-from jose import jwt
+from app.core.database_manager import get_db
 from app.core.settings import get_settings
+from app.crud.user import get as get_user_by_id
+from app.models.user import User
 
 # Placeholder for verify_token (should be implemented properly)
 
@@ -41,7 +40,7 @@ class UserDependency:
         require_active: bool = True,
         require_verified: bool = False,
         require_admin: bool = False,
-        cache_user: bool = True
+        cache_user: bool = True,
     ):
         self.require_auth = require_auth
         self.require_active = require_active
@@ -53,7 +52,7 @@ class UserDependency:
         self,
         request: Request,
         db: AsyncSession = Depends(get_db),
-        credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
+        credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
     ) -> Optional[User]:
         """Get authenticated user with advanced validation"""
 
@@ -115,34 +114,32 @@ class UserDependency:
                     "full_name": user.full_name,
                     "is_active": user.is_active,
                     "is_superuser": user.is_superuser,
-                    "is_verified": getattr(user, 'is_verified', True),
+                    "is_verified": getattr(user, "is_verified", True),
                     # Add other fields as needed
                 }
                 await cache.set(f"user:{user_id}", user_data, ttl=1800)  # 30 minutes
 
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
         # Validation checks
         if self.require_active and not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Inactive user account"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user account"
             )
 
-        if self.require_verified and not getattr(user, 'is_verified', True):
+        if self.require_verified and not getattr(user, "is_verified", True):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email verification required"
+                detail="Email verification required",
             )
 
         if self.require_admin and not user.is_superuser:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Administrative privileges required"
+                detail="Administrative privileges required",
             )
 
         # Add user to request state for logging/monitoring
@@ -162,9 +159,7 @@ class PermissionChecker:
         self.resource_type = resource_type
 
     async def __call__(
-        self,
-        request: Request,
-        user: User = Depends(UserDependency(require_auth=True))
+        self, request: Request, user: User = Depends(UserDependency(require_auth=True))
     ) -> bool:
         """Check if user has required permission"""
 
@@ -179,7 +174,7 @@ class PermissionChecker:
 
         cached_permission = await cache.get(permission_key)
         if cached_permission is not None:
-            return cached_permission
+            return bool(cached_permission)
 
         # In a real implementation, you would check permissions from database
         # For now, we'll implement basic role-based permissions
@@ -191,7 +186,7 @@ class PermissionChecker:
         if not has_permission:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{self.permission}' required"
+                detail=f"Permission '{self.permission}' required",
             )
 
         return has_permission
@@ -208,7 +203,7 @@ class PermissionChecker:
             "admin:access": user.is_superuser,  # Only admins can access admin features
         }
 
-        return permission_map.get(self.permission, False)
+        return bool(permission_map.get(self.permission, False))
 
 
 class RateLimitDependency:
@@ -230,8 +225,12 @@ class RateLimitDependency:
 # Common dependency instances
 get_current_user = UserDependency(require_auth=True, require_active=True)
 get_current_user_optional = UserDependency(require_auth=False)
-get_current_admin = UserDependency(require_auth=True, require_active=True, require_admin=True)
-get_current_verified_user = UserDependency(require_auth=True, require_active=True, require_verified=True)
+get_current_admin = UserDependency(
+    require_auth=True, require_active=True, require_admin=True
+)
+get_current_verified_user = UserDependency(
+    require_auth=True, require_active=True, require_verified=True
+)
 
 # Permission checkers
 require_events_create = PermissionChecker("events:create")
@@ -241,11 +240,15 @@ require_users_list = PermissionChecker("users:list")
 require_admin_access = PermissionChecker("admin:access")
 
 # Rate limit dependencies
-auth_rate_limit = RateLimitDependency(requests=5, window=300)  # 5 requests per 5 minutes
+auth_rate_limit = RateLimitDependency(
+    requests=5, window=300
+)  # 5 requests per 5 minutes
 api_rate_limit = RateLimitDependency(requests=100, window=3600)  # 100 requests per hour
 
 
-def cached_dependency(ttl: int = 300, key_prefix: str = "dep:"):
+def cached_dependency(
+    ttl: int = 300, key_prefix: str = "dep:"
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator to cache dependency results
 
@@ -253,12 +256,16 @@ def cached_dependency(ttl: int = 300, key_prefix: str = "dep:"):
         ttl: Time to live in seconds
         key_prefix: Cache key prefix
     """
-    def decorator(dependency_func):
+
+    def decorator(dependency_func: Any) -> Any:
         @wraps(dependency_func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Generate cache key from function name and arguments
             import hashlib
-            key_data = f"{dependency_func.__name__}:{str(args)}:{str(sorted(kwargs.items()))}"
+
+            key_data = (
+                f"{dependency_func.__name__}:{str(args)}:{str(sorted(kwargs.items()))}"
+            )
             cache_key = key_prefix + hashlib.sha256(key_data.encode()).hexdigest()
 
             # Try to get from cache
@@ -273,6 +280,7 @@ def cached_dependency(ttl: int = 300, key_prefix: str = "dep:"):
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -281,9 +289,9 @@ async def get_request_context(request: Request) -> Dict[str, Any]:
     Get comprehensive request context for logging and monitoring
     """
     return {
-        "request_id": getattr(request.state, 'request_id', None),
-        "user_id": getattr(request.state, 'user_id', None),
-        "user_email": getattr(request.state, 'user_email', None),
+        "request_id": getattr(request.state, "request_id", None),
+        "user_id": getattr(request.state, "user_id", None),
+        "user_email": getattr(request.state, "user_email", None),
         "client_ip": request.client.host if request.client else "unknown",
         "user_agent": request.headers.get("user-agent", ""),
         "method": request.method,

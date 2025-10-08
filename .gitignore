@@ -46,6 +46,26 @@ evently-env/
 .hypothesis/
 .pytest_cache/
 
+# Security - Never commit these files!
+secrets.env
+infrastructure/secrets/secrets.env
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+.kube/config
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars.json
+
+# Docker
+.dockerignore
+
 # Editor directories and files
 .vscode/
 .idea/

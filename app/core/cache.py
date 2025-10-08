@@ -2,18 +2,18 @@
 Advanced Caching Layer with Redis Backend
 Provides sophisticated caching capabilities with compression, serialization, and monitoring.
 """
-import json
+
+import asyncio
 import hashlib
+import json
 import logging
 import time
-from typing import Any, Optional, Union, Dict, List, Callable
-from datetime import timedelta, datetime
 from functools import wraps
-import asyncio
+from typing import Any, Callable, Dict, List, Optional
 
 import redis.asyncio as redis
 from redis.asyncio import Redis
-from redis.exceptions import ConnectionError, TimeoutError, RedisError
+from redis.exceptions import ConnectionError, RedisError, TimeoutError
 
 from app.core.settings import get_settings
 
@@ -38,26 +38,26 @@ class CacheSerializer:
 class CacheMetrics:
     """Track cache performance metrics"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.hits = 0
         self.misses = 0
         self.errors = 0
         self.total_requests = 0
         self.total_response_time = 0.0
 
-    def record_hit(self, response_time: float):
+    def record_hit(self, response_time: float) -> None:
         """Record cache hit"""
         self.hits += 1
         self.total_requests += 1
         self.total_response_time += response_time
 
-    def record_miss(self, response_time: float):
+    def record_miss(self, response_time: float) -> None:
         """Record cache miss"""
         self.misses += 1
         self.total_requests += 1
         self.total_response_time += response_time
 
-    def record_error(self):
+    def record_error(self) -> None:
         """Record cache error"""
         self.errors += 1
         self.total_requests += 1
@@ -84,10 +84,10 @@ class CacheMetrics:
             "errors": self.errors,
             "total_requests": self.total_requests,
             "hit_rate": round(self.hit_rate * 100, 2),
-            "average_response_time_ms": round(self.average_response_time * 1000, 2)
+            "average_response_time_ms": round(self.average_response_time * 1000, 2),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all metrics"""
         self.hits = 0
         self.misses = 0
@@ -106,17 +106,17 @@ class AdvancedCacheManager:
     - Batch operations
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.redis_client: Optional[Redis] = None
         self.metrics = CacheMetrics()
         self.serializer = CacheSerializer()
         self._circuit_breaker_failures = 0
-        self._circuit_breaker_last_failure = None
+        self._circuit_breaker_last_failure: Optional[float] = None
         self._circuit_breaker_threshold = 5
         self._circuit_breaker_timeout = 60  # seconds
         self._setup_redis_client()
 
-    def _setup_redis_client(self):
+    def _setup_redis_client(self) -> None:
         """Setup Redis client with advanced configuration"""
         try:
             self.redis_client = redis.Redis.from_url(
@@ -127,7 +127,7 @@ class AdvancedCacheManager:
                 socket_connect_timeout=settings.redis.REDIS_SOCKET_CONNECT_TIMEOUT,
                 health_check_interval=settings.redis.REDIS_HEALTH_CHECK_INTERVAL,
                 decode_responses=True,
-                encoding='utf-8'
+                encoding="utf-8",
             )
             logger.info("Redis cache client initialized successfully")
         except Exception as e:
@@ -153,21 +153,23 @@ class AdvancedCacheManager:
             self._circuit_breaker_failures = 0
             self._circuit_breaker_last_failure = None
             return False
+        else:
+            return True
 
-        return True
-
-    def _record_failure(self):
+    def _record_failure(self) -> None:
         """Record a cache operation failure"""
         self._circuit_breaker_failures += 1
-        self._circuit_breaker_last_failure = time.time()
+        self._circuit_breaker_last_failure = float(time.time())
         self.metrics.record_error()
 
-    def _record_success(self):
+    def _record_success(self) -> None:
         """Record a successful cache operation"""
         if self._circuit_breaker_failures > 0:
             self._circuit_breaker_failures = max(0, self._circuit_breaker_failures - 1)
 
-    async def get(self, key: str, default: Any = None, prefix: Optional[str] = None) -> Any:
+    async def get(
+        self, key: str, default: Any = None, prefix: Optional[str] = None
+    ) -> Any:
         """Get value from cache with error handling and metrics"""
         if not settings.scalability.CACHE_ENABLED or not self.redis_client:
             return default
@@ -210,7 +212,7 @@ class AdvancedCacheManager:
         ttl: Optional[int] = None,
         prefix: Optional[str] = None,
         nx: bool = False,
-        xx: bool = False
+        xx: bool = False,
     ) -> bool:
         """
         Set value in cache with advanced options
@@ -239,11 +241,7 @@ class AdvancedCacheManager:
 
             # Set with options
             result = await self.redis_client.set(
-                cache_key,
-                serialized_value,
-                ex=ttl,
-                nx=nx,
-                xx=xx
+                cache_key, serialized_value, ex=ttl, nx=nx, xx=xx
             )
 
             self._record_success()
@@ -296,7 +294,9 @@ class AdvancedCacheManager:
             self._record_failure()
             return False
 
-    async def increment(self, key: str, amount: int = 1, prefix: Optional[str] = None) -> Optional[int]:
+    async def increment(
+        self, key: str, amount: int = 1, prefix: Optional[str] = None
+    ) -> Optional[int]:
         """Increment a numeric value in cache"""
         if not settings.scalability.CACHE_ENABLED or not self.redis_client:
             return None
@@ -306,7 +306,7 @@ class AdvancedCacheManager:
         try:
             result = await self.redis_client.incr(cache_key, amount)
             self._record_success()
-            return result
+            return int(result) if result is not None else None
         except Exception as e:
             logger.error(f"Cache increment error for key {key}: {e}")
             self._record_failure()
@@ -328,7 +328,9 @@ class AdvancedCacheManager:
             self._record_failure()
             return False
 
-    async def get_many(self, keys: List[str], prefix: Optional[str] = None) -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], prefix: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get multiple values from cache"""
         if not settings.scalability.CACHE_ENABLED or not self.redis_client:
             return {}
@@ -357,7 +359,12 @@ class AdvancedCacheManager:
             self._record_failure()
             return {}
 
-    async def set_many(self, mapping: Dict[str, Any], ttl: Optional[int] = None, prefix: Optional[str] = None) -> bool:
+    async def set_many(
+        self,
+        mapping: Dict[str, Any],
+        ttl: Optional[int] = None,
+        prefix: Optional[str] = None,
+    ) -> bool:
         """Set multiple values in cache"""
         if not settings.scalability.CACHE_ENABLED or not self.redis_client:
             return False
@@ -397,9 +404,7 @@ class AdvancedCacheManager:
             cursor = 0  # Start with integer 0
             while True:
                 cursor, partial_keys = await self.redis_client.scan(
-                    cursor=cursor,
-                    match=cache_pattern,
-                    count=100
+                    cursor=cursor, match=cache_pattern, count=100
                 )
                 keys.extend(partial_keys)
                 if cursor == 0:
@@ -408,7 +413,7 @@ class AdvancedCacheManager:
             if keys:
                 deleted_count = await self.redis_client.delete(*keys)
                 self._record_success()
-                return deleted_count
+                return int(deleted_count)
 
             return 0
 
@@ -451,15 +456,15 @@ class AdvancedCacheManager:
                 "metrics": self.metrics.get_stats(),
                 "circuit_breaker": {
                     "failures": self._circuit_breaker_failures,
-                    "is_open": self._is_circuit_breaker_open()
+                    "is_open": self._is_circuit_breaker_open(),
                 },
                 "redis_info": {
                     "connected_clients": info.get("connected_clients", 0),
                     "used_memory": info.get("used_memory_human", "unknown"),
                     "keyspace_hits": info.get("keyspace_hits", 0),
                     "keyspace_misses": info.get("keyspace_misses", 0),
-                    "version": info.get("redis_version", "unknown")
-                }
+                    "version": info.get("redis_version", "unknown"),
+                },
             }
 
         except Exception as e:
@@ -470,7 +475,7 @@ class AdvancedCacheManager:
         """Get cache performance metrics"""
         return self.metrics.get_stats()
 
-    def reset_metrics(self):
+    def reset_metrics(self) -> None:
         """Reset performance metrics"""
         self.metrics.reset()
 
@@ -480,8 +485,8 @@ def cache_result(
     ttl: int = 3600,
     key_prefix: str = "func:",
     use_args: bool = True,
-    use_kwargs: bool = True
-):
+    use_kwargs: bool = True,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator to cache function results
 
@@ -491,9 +496,10 @@ def cache_result(
         use_args: Include function arguments in cache key
         use_kwargs: Include function keyword arguments in cache key
     """
-    def decorator(func: Callable):
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Generate cache key
             key_parts = [func.__name__]
 
@@ -520,6 +526,7 @@ def cache_result(
             return result
 
         return wrapper
+
     return decorator
 
 

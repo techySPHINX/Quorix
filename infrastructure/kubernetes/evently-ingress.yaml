@@ -1,0 +1,143 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: evently-ingress
+  namespace: evently
+  labels:
+    app: evently
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:ACCOUNT_ID:certificate/CERT_ID
+
+    # Security annotations
+    alb.ingress.kubernetes.io/security-groups: sg-xxxxxxxxx
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-west-2:ACCOUNT_ID:regional/webacl/evently-waf/WAF_ID
+
+    # Performance annotations
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=evently-prod-alb-logs,
+      access_logs.s3.prefix=evently-api
+
+    # Health check annotations
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+
+    # Rate limiting (if using nginx ingress controller instead)
+    # nginx.ingress.kubernetes.io/rate-limit: "100"
+    # nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+
+spec:
+  rules:
+    - host: api.evently.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: evently-api-service
+                port:
+                  number: 80
+    - host: flower.evently.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: evently-flower-service
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - api.evently.yourdomain.com
+        - flower.evently.yourdomain.com
+      secretName: evently-tls-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: evently-tls-secret
+  namespace: evently
+type: kubernetes.io/tls
+data:
+  # Base64 encoded TLS certificate and key
+  tls.crt: LS0tLS1CRUdJTi... # Your TLS certificate
+  tls.key: LS0tLS1CRUdJTi... # Your TLS private key
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: evently-network-policy
+  namespace: evently
+spec:
+  podSelector:
+    matchLabels:
+      app: evently-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              name: evently
+      ports:
+        - protocol: TCP
+          port: 8000
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8001 # Metrics port
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432 # PostgreSQL
+        - protocol: TCP
+          port: 6379 # Redis
+        - protocol: TCP
+          port: 443 # HTTPS outbound
+        - protocol: TCP
+          port: 80 # HTTP outbound
+        - protocol: UDP
+          port: 53 # DNS
+---
+# Pod Disruption Budget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: evently-api-pdb
+  namespace: evently
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: evently-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: evently-worker-pdb
+  namespace: evently
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: evently-worker
