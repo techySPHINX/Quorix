@@ -6,7 +6,7 @@ from typing import Any, Dict, cast
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi_limiter import FastAPILimiter
-from pythonjsonlogger.json import JsonFormatter
+import structlog
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.cors import CORSMiddleware
 
@@ -96,11 +96,11 @@ app = FastAPI(
     Get your token by authenticating via `/api/v1/auth/login` endpoint.
     """,
     version=settings.VERSION,
-    terms_of_service="https://github.com/techySPHINX/evently/blob/main/LICENSE",
+    terms_of_service="https://github.com/techySPHINX/quorix/blob/main/LICENSE",
     contact={
-        "name": "Evently Support",
-        "url": "https://github.com/techySPHINX/evently",
-        "email": "support@evently.com",
+        "name": "Quorix Support",
+        "url": "https://github.com/techySPHINX/quorix",
+        "email": "support@quorix.com",
     },
     license_info={
         "name": "MIT License",
@@ -118,24 +118,20 @@ app = FastAPI(
     },
 )
 
-# Configure structured logging
-log_handler = logging.StreamHandler()
-formatter = JsonFormatter(
-    """
-    {
-        "level": "%(levelname)s",
-        "time": "%(asctime)s",
-        "message": "%(message)s",
-        "loggerName": "%(name)s",
-        "processName": "%(processName)s",
-        "fileName": "%(filename)s",
-        "lineNumber": "%(lineno)d"
-    }
-    """
+
+# Configure structured logging with structlog
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
 )
-log_handler.setFormatter(formatter)
-logging.basicConfig(handlers=[log_handler], level=settings.monitoring.LOG_LEVEL)
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=settings.monitoring.LOG_LEVEL)
+logger = structlog.get_logger(__name__)
 logger.info("Application logging configured with enhanced features.")
 
 # Add advanced middleware stack
@@ -228,7 +224,7 @@ async def root() -> dict[str, Any]:
     Returns basic API information and links to documentation.
     """
     return {
-        "message": "Welcome to Evently - Advanced Event Management Platform",
+        "message": "Welcome to Quorix - Advanced Event Management Platform",
         "version": settings.VERSION,
         "docs": f"{settings.API_V1_PREFIX}/docs",
         "redoc": f"{settings.API_V1_PREFIX}/redoc",

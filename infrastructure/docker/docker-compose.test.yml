@@ -1,0 +1,122 @@
+# Docker Compose for Testing Evently
+# Provides isolated test environment with all dependencies
+
+version: "3.8"
+
+services:
+  # PostgreSQL for testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: evently-test-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: evently_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: evently-test-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test runner
+  test-runner:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.test
+    container_name: evently-test-runner
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/evently_test
+      REDIS_URL: redis://redis-test:6379
+      SECRET_KEY: test-secret-key
+      JWT_SECRET_KEY: test-jwt-secret
+      ENCRYPTION_KEY: test-encryption-key-32-chars-t
+      PYTHONPATH: /app
+    volumes:
+      - ../:/app
+      - test-reports:/app/reports
+    command: pytest tests/ -v --cov=app --cov-report=html --cov-report=term
+
+  # Selenium Chrome for E2E tests
+  selenium-chrome:
+    image: selenium/standalone-chrome:latest
+    container_name: evently-selenium-chrome
+    ports:
+      - "4444:4444"
+      - "7900:7900" # VNC server
+    shm_size: 2gb
+    environment:
+      SE_NODE_MAX_SESSIONS: 5
+      SE_NODE_SESSION_TIMEOUT: 300
+
+  # Application for E2E testing
+  app-e2e:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.production
+    container_name: evently-app-e2e
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/evently_test
+      REDIS_URL: redis://redis-test:6379
+      SECRET_KEY: test-secret-key
+      JWT_SECRET_KEY: test-jwt-secret
+      ENCRYPTION_KEY: test-encryption-key-32-chars-t
+    ports:
+      - "8001:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  # E2E test runner
+  e2e-runner:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.test
+    container_name: evently-e2e-runner
+    depends_on:
+      - selenium-chrome
+      - app-e2e
+    environment:
+      TEST_BASE_URL: http://app-e2e:8000
+      SELENIUM_REMOTE_URL: http://selenium-chrome:4444/wd/hub
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/evently_test
+      REDIS_URL: redis://redis-test:6379
+    volumes:
+      - ../:/app
+      - test-reports:/app/reports
+    command: >
+      bash -c "
+        sleep 10 &&
+        pytest tests/e2e/ -v --browser=chrome --html=reports/e2e-report.html --self-contained-html
+      "
+
+volumes:
+  postgres-test-data:
+  test-reports:
+
+networks:
+  default:
+    name: evently-test-network
