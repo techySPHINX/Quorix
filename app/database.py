@@ -33,3 +33,7 @@ async def get_database() -> AsyncGenerator[AsyncSession, None]:
         )
     async with async_session_maker() as session:
         yield session
+
+
+# Export get_db for backward compatibility
+get_db = get_database

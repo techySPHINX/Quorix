@@ -29,7 +29,9 @@ async def join_event_waitlist(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    if event.available_tickets >= waitlist_in.number_of_tickets:
+    # Check if event has available tickets
+    available = getattr(event, "available_tickets", 0)
+    if available >= waitlist_in.number_of_tickets:
         raise HTTPException(
             status_code=400, detail="Event has available tickets. Please book directly."
         )
@@ -56,7 +58,8 @@ async def get_my_waitlist(
     """
     Get current user's waitlist entries.
     """
-    return await crud.waitlist.get_user_waitlist(db, current_user.id, skip, limit)
+    db_waitlist = await crud.waitlist.get_user_waitlist(db, current_user.id, skip, limit)
+    return [Waitlist.model_validate(entry) for entry in db_waitlist]
 
 
 @router.delete("/{waitlist_id}")  # type: ignore[misc]
@@ -118,4 +121,5 @@ async def get_event_waitlist(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    return await crud.waitlist.get_event_waitlist(db, event_id)
+    db_waitlist = await crud.waitlist.get_event_waitlist(db, event_id)
+    return [Waitlist.model_validate(entry) for entry in db_waitlist]
