@@ -1,4 +1,7 @@
-"""Pytest conftest to make repository importable during tests."""
+"""
+Comprehensive Test Configuration and Fixtures
+Provides fixtures for database, API client, Selenium browser, and test data
+"""
 
 from app.main import app
 from app.database import Base, get_database
@@ -27,7 +30,6 @@ from webdriver_manager.firefox import GeckoDriverManager
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
-    # Insert at front so local package imports resolve
     sys.path.insert(0, str(REPO_ROOT))
 
 
